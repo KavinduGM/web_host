@@ -1,0 +1,135 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --border: #262a33;
+  --text: #e6e8ee;
+  --muted: #8a93a6;
+  --accent: #4f7cff;
+  --accent-hover: #3f68e0;
+  --danger: #e25555;
+  --success: #2ecc71;
+  --warn: #f1c40f;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.topbar .brand { font-weight: 600; letter-spacing: 0.3px; }
+.topbar nav a { margin-right: 16px; color: var(--muted); }
+.topbar nav a.active { color: var(--text); }
+
+.container { max-width: 1100px; margin: 24px auto; padding: 0 24px; width: 100%; }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.btn {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #1f232c;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+}
+.btn:hover { background: #262b35; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+.btn.primary:hover { background: var(--accent-hover); }
+.btn.danger { background: transparent; border-color: var(--danger); color: var(--danger); }
+.btn.danger:hover { background: rgba(226, 85, 85, 0.1); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.input, .textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  background: #0c0f14;
+  color: var(--text);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.input:focus, .textarea:focus { outline: none; border-color: var(--accent); }
+.textarea { resize: vertical; min-height: 80px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+.field .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+.row { display: flex; gap: 12px; align-items: center; }
+.row.between { justify-content: space-between; }
+.gap-sm > * + * { margin-left: 8px; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 12px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+th { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+td.actions { white-space: nowrap; }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.badge.ready { background: rgba(46, 204, 113, 0.15); color: var(--success); }
+.badge.building { background: rgba(241, 196, 15, 0.15); color: var(--warn); }
+.badge.failed { background: rgba(226, 85, 85, 0.15); color: var(--danger); }
+.badge.pending { background: rgba(138, 147, 166, 0.15); color: var(--muted); }
+.badge.disabled { background: rgba(138, 147, 166, 0.15); color: var(--muted); }
+
+.login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+.login-card { width: 100%; max-width: 360px; }
+.login-card h1 { margin: 0 0 6px; font-size: 20px; }
+.login-card p { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+
+.error { color: var(--danger); font-size: 13px; margin: 6px 0; }
+.empty { text-align: center; color: var(--muted); padding: 40px 20px; }
+
+pre.log {
+  background: #07090d;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px;
+  max-height: 480px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.muted { color: var(--muted); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+h1 { font-size: 22px; margin: 0 0 16px; }
+h2 { font-size: 16px; margin: 24px 0 12px; }

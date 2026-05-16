@@ -1,0 +1,25 @@
+[Unit]
+Description=Web Host Tool — demo hosting admin
+After=network.target
+
+[Service]
+Type=simple
+User=webhost
+Group=webhost
+WorkingDirectory=/opt/web-host-tool/server
+EnvironmentFile=/opt/web-host-tool/server/.env
+ExecStart=/usr/bin/node src/index.js
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/www/demos /var/lib/web-host-tool
+
+[Install]
+WantedBy=multi-user.target
