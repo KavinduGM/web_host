@@ -3,7 +3,17 @@ import path from 'node:path';
 
 function required(name) {
   const v = process.env[name];
-  if (!v) throw new Error(`Missing required env var: ${name}`);
+  if (!v) {
+    const seen = Object.keys(process.env)
+      .filter((k) => !/^(PATH|HOME|HOSTNAME|PWD|SHLVL|TERM|_|LANG|LC_)/.test(k))
+      .sort();
+    console.error(`\n[config] Missing required env var: ${name}`);
+    console.error(`[config] Env vars currently visible to the process:`);
+    console.error(`[config]   ${seen.join(', ') || '(none non-system)'}`);
+    console.error(`[config] If "${name}" is not in that list, the runtime isn't passing it in.`);
+    console.error(`[config] In Dokploy: put it under "Environment" (not "Build Arguments") and redeploy.\n`);
+    throw new Error(`Missing required env var: ${name}`);
+  }
   return v;
 }
 
