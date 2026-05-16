@@ -1,44 +1,109 @@
 # Web Host Tool
 
-A self-hosted multi-tenant demo platform. Paste a Git URL, pick a slug, and you get back a public link like `https://demos.yourdomain.com/spil-glass/` that serves the built React site. Enable/disable/delete demos with one click.
+A self-hosted multi-tenant demo platform. Paste a Git URL, pick a slug, get back a public link like `https://demos.yourdomain.com/spil-glass/` that serves the built React site. Enable/disable/delete demos with one click.
 
-Designed for a Hostinger VPS KVM 2 (Ubuntu/Debian).
+Designed to run as a single Docker container on Dokploy (or anywhere else).
 
 ---
 
 ## How it works
 
 ```
-                       ┌──────────────────────────────┐
-HTTPS  ────►  nginx ──►│  /admin, /api  → Node (3001) │
-                       │  /<slug>/*    → /var/www/demos/<slug>/  (static)
-                       └──────────────────────────────┘
-                                       ▲
-                                       │  build worker:
-                                       │  git clone --depth 1 <url>
-                                       │  npm ci && npm run build
-                                       │  atomic publish to /var/www/demos/<slug>/
+                ┌─────────────────────────────────────────┐
+HTTPS ──►  Dokploy/Traefik  ──►│  Node (3001)
+(your domain)                  │   ├── /admin → React admin UI
+                               │   ├── /api   → REST API
+                               │   └── /<slug>/* → built demo files
+                               └─────────────────────────────────────────┘
+                                              ▲
+                                              │  build worker:
+                                              │  git clone --depth 1 <url>
+                                              │  npm ci && npm run build
+                                              │  atomic publish to /data/demos/<slug>/
 ```
 
-- **Path-based URLs** — `demos.yourdomain.com/<slug>/`, one wildcard SSL cert covers everything.
-- **Atomic publish** — builds go to a staging dir, then are swapped in by rename so demos never appear half-built.
-- **Static-only** — designed for Vite/CRA React sites (no Next.js SSR / no Node runtime per demo).
-- **Disable, don't delete** — disabled demos move to `/var/www/demos/.disabled/` and become 404s; re-enable to restore instantly.
+- **One container** — Node serves the admin UI, the API, and every demo's static files. No internal nginx layer.
+- **Path-based URLs** — `demos.yourdomain.com/<slug>/`. One certificate covers everything.
+- **Atomic publish** — builds go to a staging dir then rename-swapped in, so demos never appear half-built.
+- **Static-only** — designed for Vite/CRA React sites (no Next.js SSR / no per-demo Node runtime).
+- **Disable, don't delete** — disabled demos move to `.disabled/` (instant 404), re-enable to restore.
 - **Single admin password** — bcrypt-hashed, JWT cookie session.
+- **SQLite, not Postgres** — single-instance tool, low write volume. Just persist the `.db` file via a volume. No external DB needed.
 
 ---
 
 ## Project layout
 
 ```
-server/      Express API + build worker + SQLite
-client/      React + Vite admin UI (compiled into client/dist/)
-deploy/      nginx config, systemd unit, one-shot setup script
+Dockerfile          Multi-stage build (client → server deps → runtime)
+docker-compose.yml  Local testing convenience
+server/             Express API + build worker + SQLite
+client/             React + Vite admin UI (built into client/dist/ inside the image)
+deploy/             Bare-VPS files (nginx + systemd) — only if NOT using Docker
 ```
 
 ---
 
-## Local development
+## Deploy on Dokploy
+
+### 1. Push the code to a Git repo
+You've already done this — Dokploy needs a Git URL to deploy from.
+
+### 2. Create the application in Dokploy
+- **New application → Docker / Dockerfile-based**
+- **Source:** point to your repo + branch (e.g. `main`)
+- **Build Type:** Dockerfile
+- **Dockerfile path:** `./Dockerfile` (default)
+
+### 3. Configure environment variables
+Add these in Dokploy's **Environment** tab:
+
+| Variable | Value |
+|---|---|
+| `JWT_SECRET` | output of `openssl rand -hex 32` |
+| `ADMIN_PASSWORD_HASH` | output of `node -e "console.log(require('bcryptjs').hashSync('YOUR-PASSWORD', 10))"` |
+| `PUBLIC_BASE_URL` | `https://demos.yourdomain.com` (no trailing slash) |
+| `BUILD_CONCURRENCY` | `1` (raise if your VPS has spare CPU) |
+
+`PORT`, `BIND_HOST`, `NODE_ENV`, and the `*_DIR` / `DB_PATH` defaults are already set inside the Dockerfile — don't override them unless you have a reason.
+
+### 4. Add persistent volumes
+In **Mounts / Volumes**, create two **Volume** mounts (NOT bind mounts unless you specifically want a host path):
+
+| Volume name | Mount path | What it holds |
+|---|---|---|
+| `web-host-demos` | `/data/demos` | Built demo sites (served at `/<slug>/`). If you lose this you can rebuild from Git. |
+| `web-host-state` | `/data/state` | SQLite DB + build scratch space. **Back this up** — it's the only thing you can't rebuild. |
+
+### 5. Configure the domain
+In **Domains** add `demos.yourdomain.com`, target port `3001`, enable HTTPS (Let's Encrypt). Dokploy's Traefik handles SSL and forwards everything to the container.
+
+### 6. Deploy
+Hit **Deploy**. First build takes 2-3 minutes (npm installs in two stages). Once it's up, open `https://demos.yourdomain.com/admin` and sign in.
+
+### 7. Updating
+Push to your branch → click **Redeploy** in Dokploy (or enable auto-deploy on push). Volumes persist across deploys, so demos and the database survive.
+
+---
+
+## Local testing with Docker
+
+```bash
+# 1. Edit docker-compose.yml — fill in JWT_SECRET and ADMIN_PASSWORD_HASH.
+#    (Bcrypt hashes contain $ — in compose YAML you must double them to $$.)
+
+# Generate the hash (paste output, then double each $ -> $$ in the YAML):
+node -e "console.log(require('bcryptjs').hashSync('changeme', 10))"
+
+# 2. Run it
+docker compose up --build
+
+# 3. Open http://localhost:3001/admin
+```
+
+---
+
+## Local development (no Docker)
 
 ```bash
 # Backend
@@ -49,7 +114,7 @@ cp .env.example .env
 openssl rand -hex 32
 # generate ADMIN_PASSWORD_HASH:
 node -e "console.log(require('bcryptjs').hashSync('changeme', 10))"
-# paste into .env, then for local dev:
+# paste into .env, then set local paths:
 #   DEMOS_DIR=./_demos
 #   DISABLED_DIR=./_demos/.disabled
 #   WORK_DIR=./_work
@@ -63,96 +128,41 @@ npm install
 npm run dev      # http://localhost:5173/admin/ (proxies /api → :3001)
 ```
 
-Open <http://localhost:5173/admin/> and log in with the password you hashed.
-
-To preview locally end-to-end (no nginx), run `npm run build` in `client/` — the server will serve the built bundle from `/admin`.
-
----
-
-## VPS deployment (Hostinger KVM 2, Ubuntu 22.04+)
-
-1. **Point DNS.** Create an A record: `demos.yourdomain.com → <your VPS IP>`.
-
-2. **SSH in as root** and copy this repo to the VPS (via git, scp, or rsync):
-
-   ```bash
-   ssh root@your-vps
-   git clone https://github.com/your-org/web-host-tool.git /tmp/web-host-tool
-   bash /tmp/web-host-tool/deploy/setup.sh demos.yourdomain.com
-   ```
-
-   The setup script installs Node 20, nginx, creates the `webhost` user, sets up `/var/www/demos`, drops in the nginx config, and prints the remaining steps.
-
-3. **Install the app** (the script prints these exact commands):
-
-   ```bash
-   sudo -u webhost cp -r /tmp/web-host-tool /opt/web-host-tool
-   cd /opt/web-host-tool/client && sudo -u webhost npm ci && sudo -u webhost npm run build
-   cd /opt/web-host-tool/server && sudo -u webhost npm ci
-   sudo -u webhost cp .env.example .env
-   # Fill in JWT_SECRET and ADMIN_PASSWORD_HASH — see helpers below.
-   sudo -u webhost nano .env
-   ```
-
-   Generate the two secrets:
-   ```bash
-   openssl rand -hex 32                                                # JWT_SECRET
-   sudo -u webhost node -e "console.log(require('bcryptjs').hashSync('YOUR-PASSWORD', 10))"
-   ```
-
-4. **Start the service:**
-
-   ```bash
-   sudo cp /opt/web-host-tool/deploy/web-host-tool.service /etc/systemd/system/
-   sudo systemctl daemon-reload
-   sudo systemctl enable --now web-host-tool
-   sudo systemctl status web-host-tool
-   ```
-
-5. **Enable HTTPS:**
-
-   ```bash
-   sudo apt-get install -y certbot python3-certbot-nginx
-   sudo certbot --nginx -d demos.yourdomain.com
-   ```
-
-6. **Open the admin panel:** `https://demos.yourdomain.com/admin`
+For an end-to-end local preview (admin + demos), run `npm run build` in `client/` first — the server serves everything from port 3001.
 
 ---
 
 ## Using it
 
 ### Add a demo
-1. Click **New demo**.
+1. **New demo**
 2. Fill in:
-   - **Name** — display name (e.g. "SPIL Glass demo")
+   - **Name** — display name
    - **Slug** — URL segment (e.g. `spil-glass` → `/spil-glass/`)
-   - **Git URL** — HTTPS clone URL (or SSH if you set up a deploy key on the VPS)
-   - **Branch** — defaults to `main`
-   - **Build command** — defaults to `npm ci && npm run build`
+   - **Git URL** — HTTPS clone URL (or SSH if you set up a deploy key)
+   - **Branch** — default `main`
+   - **Build command** — default `npm ci && npm run build`
    - **Output directory** — `dist` for Vite, `build` for CRA
-3. Hit **Create & build**. You'll land on the detail page where the build log streams live.
+3. **Create & build**. Build log streams live on the detail page.
 
 ### Send to a client
-Once status is **ready**, copy the demo URL (`https://demos.yourdomain.com/<slug>/`) and send it on LinkedIn.
+Once status is **ready**, the demo URL is `https://demos.yourdomain.com/<slug>/`.
 
 ### Rebuild after pushing changes
-On the demo detail page, click **Rebuild**. The build clones the latest branch tip and atomically replaces the live files.
+**Rebuild** on the detail page — clones the latest branch tip and atomically replaces the live files.
 
 ### Disable / re-enable / delete
-- **Disable** — moves files to `.disabled/`; link returns 404. Click **Enable** to restore.
-- **Delete** — removes files and the DB row. Irreversible.
+- **Disable** moves files to `.disabled/`; link returns 404.
+- **Enable** restores.
+- **Delete** removes files and the DB row.
 
 ---
 
-## SPA routing (client-side React Router)
+## SPA routing in your demos (important)
 
-The nginx config in `deploy/nginx.conf.example` falls back any unmatched path under `/<slug>/...` to `/<slug>/index.html`, so React Router (`BrowserRouter`) works.
-
-**Important — Vite config in each demo site:** set `base: '/<slug>/'` in `vite.config.js`, otherwise asset URLs will 404. The simplest setup: read it from an env var at build time.
+Each demo is served from `/<slug>/`, so its built assets must be written with that base path. In each demo repo's `vite.config.js`:
 
 ```js
-// vite.config.js inside each demo repo
 export default defineConfig({
   base: process.env.PUBLIC_BASE_PATH || '/',
   // …
@@ -164,21 +174,28 @@ Then in the host tool's **Build command** field for that demo:
 PUBLIC_BASE_PATH=/spil-glass/ npm ci && npm run build
 ```
 
+Without this, asset URLs come out absolute (`/assets/...`) and will 404 under the slug prefix. Client-side routing (React Router `BrowserRouter`) works either way thanks to the SPA fallback the server performs.
+
 ---
 
 ## Notes & gotchas
 
-- **Private Git repos** — generate an SSH deploy key on the VPS for the `webhost` user and add it to the repo's deploy keys, or include credentials in an HTTPS clone URL (less safe).
-- **Build resources** — Hostinger KVM 2 has 2 vCPU / 8 GB RAM, plenty for one React build at a time. `BUILD_CONCURRENCY=1` is the default; bump it if you have spare capacity.
-- **Disk** — each demo's built output is a few MB. The clone+build scratch space lives under `/var/lib/web-host-tool/work` and is wiped after each build.
-- **Backups** — back up `/var/lib/web-host-tool/data.db` (SQLite). Demos themselves can be rebuilt from Git.
-- **Reserved slugs** — `admin`, `api`, `health`, `assets`, etc. are blocked. See `server/src/slug.js`.
-- **No HTTPS in dev** — `secure` cookie flag is off when `NODE_ENV != production`. Systemd unit doesn't set `NODE_ENV`; add `Environment=NODE_ENV=production` to the service file if you want cookies marked Secure (recommended once HTTPS is on).
+- **Private Git repos** — generate an SSH key inside the container (or pre-bake one) and add it as a deploy key. Easiest: switch the URL to HTTPS with a fine-scoped token (`https://oauth2:TOKEN@github.com/org/repo.git`).
+- **Build resources** — Hostinger KVM 2 (2 vCPU / 8 GB) handles one React build comfortably. `BUILD_CONCURRENCY=1` by default.
+- **Backups** — the only file you can't rebuild is `/data/state/data.db`. Snapshot the `web-host-state` volume, or run `sqlite3 data.db .backup ...` on a schedule.
+- **Reserved slugs** — `admin`, `api`, `health`, `assets`, `login`, `logout`, `_next`, `public`, `static` are blocked. See `server/src/slug.js`.
+- **NODE_ENV=production** — already set in the Dockerfile, so cookies are marked `Secure`. If you ever run without HTTPS in front, browsers will drop the auth cookie and login will appear to silently fail.
 
 ---
 
 ## Tweaking the architecture
 
-- **Subdomain mode later** — if you want `<slug>.demos.yourdomain.com` instead, add a wildcard DNS record + wildcard SSL cert and change the nginx config to route on `$host`. Slug validation is already strict enough to be safe in a hostname.
+- **Subdomain mode later** — if you want `<slug>.demos.yourdomain.com` instead, add wildcard DNS + wildcard cert in Dokploy and route on `Host` header to the same container; the demo middleware can be adapted to match on hostname instead of path.
 - **Multiple users** — replace the single-password auth in `server/src/auth.js` and `routes/auth.js` with a `users` table.
-- **SSR demos** — would require per-demo Node processes and dynamic upstream proxying; not supported in this version.
+- **SSR demos** — not supported. Would require per-demo Node processes and dynamic upstream proxying.
+
+---
+
+## Bare-VPS path (no Docker)
+
+If you ever want to skip Dokploy and run on a plain VPS with nginx + systemd, see `deploy/` for `nginx.conf.example`, `web-host-tool.service`, and `setup.sh`. Those files predate the Docker setup and assume nginx sits in front of Node — they're kept for reference but aren't the recommended path.

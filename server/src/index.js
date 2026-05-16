@@ -7,6 +7,7 @@ import { config } from './config.js';
 import './db.js';
 import authRoutes from './routes/auth.js';
 import demoRoutes from './routes/demos.js';
+import { demoServerMiddleware } from './demoServer.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -25,16 +26,22 @@ if (fs.existsSync(clientDist)) {
   app.get('/admin/*', (req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'));
   });
-  app.get('/', (req, res) => res.redirect('/admin'));
 }
+
+// Serve demos at /<slug>/...  (must come AFTER /admin, /api, /health)
+app.use(demoServerMiddleware());
+
+// Root → admin
+app.get('/', (req, res) => res.redirect('/admin'));
 
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: 'internal error' });
 });
 
-app.listen(config.port, '127.0.0.1', () => {
-  console.log(`web-host-tool listening on http://127.0.0.1:${config.port}`);
+const host = process.env.BIND_HOST || '0.0.0.0';
+app.listen(config.port, host, () => {
+  console.log(`web-host-tool listening on ${host}:${config.port}`);
   console.log(`demos dir:    ${config.demosDir}`);
   console.log(`disabled dir: ${config.disabledDir}`);
   console.log(`work dir:     ${config.workDir}`);

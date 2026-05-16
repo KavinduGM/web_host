@@ -1,0 +1,25 @@
+# Local testing — Dokploy uses the Dockerfile directly, not this file.
+# Run:  docker compose up --build
+# Then: http://localhost:3001/admin
+
+services:
+  web-host-tool:
+    build: .
+    container_name: web-host-tool
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      # Generate with: openssl rand -hex 32
+      JWT_SECRET: "change-me-to-a-long-random-string"
+      # Generate with: node -e "console.log(require('bcryptjs').hashSync('changeme', 10))"
+      ADMIN_PASSWORD_HASH: "$$2a$$10$$REPLACE_WITH_REAL_BCRYPT_HASH"
+      PUBLIC_BASE_URL: "http://localhost:3001"
+      BUILD_CONCURRENCY: "1"
+    volumes:
+      - demos:/data/demos
+      - state:/data/state
+
+volumes:
+  demos:
+  state:
