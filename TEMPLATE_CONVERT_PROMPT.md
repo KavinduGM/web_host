@@ -40,6 +40,7 @@ export type SiteConfig = {
     name: string;
     tagline?: string;
     logo: string;
+    favicon?: string;    // optional — host tool rewrites <link rel="icon"> for tenants
   };
   colors: {
     primary: string;
@@ -174,6 +175,32 @@ Rules:
   sensible (often `site.company.name` or an empty string).
 - Sections that depend on a list (products, testimonials, team) must
   hide themselves cleanly when the list is empty/undefined.
+
+### 2.5. React Router basename MUST be runtime-driven
+
+If the site uses react-router-dom's `BrowserRouter` with
+`basename={import.meta.env.BASE_URL}`, change it to read the host tool's
+runtime override first, falling back to BASE_URL for local dev. The host
+tool injects `window.__BASE_URL__` for tenants so a re-branded copy at
+`/spil-glass/` works even though the bundle was built with
+`base: '/novatec-glass/'`.
+
+In `main.tsx`:
+```tsx
+declare global {
+  interface Window { __BASE_URL__?: string }
+}
+const basename =
+  (typeof window !== 'undefined' && window.__BASE_URL__) ||
+  import.meta.env.BASE_URL;
+
+<BrowserRouter basename={basename}>
+  <App />
+</BrowserRouter>
+```
+
+Skip this and every tenant URL renders blank — Router's baked-in
+basename won't match the tenant's actual URL.
 
 ### 3. Colors flow through CSS variables
 

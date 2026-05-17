@@ -7,7 +7,7 @@ const BLANK = {
   slug: '',
   template_id: null,
   config: {
-    company:  { name: '', tagline: '', logo: '' },
+    company:  { name: '', tagline: '', logo: '', favicon: '' },
     colors:   { primary: '#003d7a', accent: '#f7b500', primaryText: '' },
     contact:  { email: '', phone: '', address: '', socials: { facebook: '', instagram: '', linkedin: '', whatsapp: '' } },
     hero:     { headline: '', subheadline: '', ctaLabel: '', ctaHref: '' },
@@ -235,6 +235,31 @@ export default function TenantEditor() {
           {form.config.company.logo && (
             <div style={{ marginTop: 8 }}>
               <img src={form.config.company.logo} alt="logo preview" style={{ maxHeight: 56, background: '#fff', padding: 6, borderRadius: 4 }} />
+            </div>
+          )}
+        </div>
+
+        <div className="field">
+          <label>Favicon</label>
+          <div className="row gap-sm">
+            <input
+              className="input mono"
+              value={form.config.company.favicon || ''}
+              onChange={(e) => setCfg('company.favicon', e.target.value)}
+              placeholder="/spil-glass/__tenant__/uploads/favicon.png  or paste URL"
+              style={{ flex: 1 }}
+            />
+            <label className="btn">
+              Upload
+              <input type="file" accept="image/*,image/x-icon" hidden onChange={(e) => upload(e, 'favicon', 'company.favicon')} />
+            </label>
+          </div>
+          <div className="hint">
+            Browser tab icon. Use a square PNG (e.g. 64×64) or .ico. Browsers cache favicons aggressively — to test, open in a new private window.
+          </div>
+          {form.config.company.favicon && (
+            <div style={{ marginTop: 8 }}>
+              <img src={form.config.company.favicon} alt="favicon preview" style={{ width: 32, height: 32, background: '#fff', padding: 4, borderRadius: 4 }} />
             </div>
           )}
         </div>

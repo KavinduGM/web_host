@@ -102,10 +102,13 @@ export function demoServerMiddleware() {
       return res.sendFile(indexPath);
     }
 
-    // Tenant: inject window.__SITE__ into the HTML.
+    // Tenant: inject window.__SITE__ + window.__BASE_URL__ into the HTML,
+    // and rewrite the <link rel="icon"> if the tenant supplied a favicon.
     try {
       const html = await fsp.readFile(indexPath, 'utf8');
-      const injected = injectSiteConfig(html, activeTenant.config);
+      const tenantBase = `/${activeTenant.slug}/`;
+      const favicon = activeTenant.config?.company?.favicon;
+      const injected = transformHtmlForTenant(html, activeTenant.config, tenantBase, favicon);
       return res.send(injected);
     } catch (err) {
       console.error('[demoServer] inject failed:', err);
@@ -118,14 +121,40 @@ async function stat(p) {
   try { return await fsp.stat(p); } catch { return null; }
 }
 
-function injectSiteConfig(html, cfg) {
-  const tag = `<script>window.__SITE__=${serializeForScript(cfg)};</script>`;
-  // Inject just before </head>, or before the first <script> if no head close, or prepend.
-  if (/<\/head>/i.test(html)) {
-    return html.replace(/<\/head>/i, `${tag}</head>`);
+function escapeAttr(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;');
+}
+
+function transformHtmlForTenant(html, cfg, baseUrl, favicon) {
+  // 1. Inject the runtime config + the correct basename for client-side routers.
+  const scriptTag =
+    `<script>` +
+      `window.__BASE_URL__=${JSON.stringify(baseUrl)};` +
+      `window.__SITE__=${serializeForScript(cfg)};` +
+    `</script>`;
+
+  let out = html;
+  if (/<\/head>/i.test(out)) {
+    out = out.replace(/<\/head>/i, `${scriptTag}</head>`);
+  } else if (/<script/i.test(out)) {
+    out = out.replace(/<script/i, `${scriptTag}<script`);
+  } else {
+    out = scriptTag + out;
   }
-  if (/<script/i.test(html)) {
-    return html.replace(/<script/i, `${tag}<script`);
+
+  // 2. Favicon: swap the existing <link rel="icon"> href (or insert one).
+  if (favicon) {
+    const newLink = `<link rel="icon" href="${escapeAttr(favicon)}" />`;
+    const linkRegex = /<link\b[^>]*\brel=["']?(?:icon|shortcut icon)["']?[^>]*>/i;
+    if (linkRegex.test(out)) {
+      out = out.replace(linkRegex, newLink);
+    } else if (/<\/head>/i.test(out)) {
+      out = out.replace(/<\/head>/i, `${newLink}</head>`);
+    }
   }
-  return tag + html;
+
+  return out;
 }

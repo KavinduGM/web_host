@@ -35,6 +35,7 @@ export function normalizeConfig(input) {
       name:    asString(input.company.name),
       tagline: asString(input.company.tagline),
       logo:    asString(input.company.logo),
+      favicon: asString(input.company.favicon),
     };
   }
   if (input.colors && typeof input.colors === 'object') {

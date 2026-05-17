@@ -57,6 +57,8 @@ strings anywhere in JSX.
        name: string;
        tagline?: string;
        logo: string;          // image URL (absolute or tenant-uploaded)
+       favicon?: string;      // favicon URL — host tool rewrites <link rel="icon">
+                              // from this field; no template code needed.
      };
      colors: {
        primary: string;       // any CSS color
@@ -199,7 +201,29 @@ strings anywhere in JSX.
      base: process.env.PUBLIC_BASE_PATH || '/',
    });
    ```
-   And for React Router: `<BrowserRouter basename={import.meta.env.BASE_URL}>`.
+
+   **React Router basename — MUST read from `window.__BASE_URL__` first.**
+   The host tool injects this at runtime so a tenant served at `/spil-glass/`
+   gets the right basename even when the template was built with
+   `base: '/novatec-glass/'`. In `main.tsx`:
+
+   ```tsx
+   declare global {
+     interface Window { __BASE_URL__?: string }
+   }
+   const basename =
+     (typeof window !== 'undefined' && window.__BASE_URL__) ||
+     import.meta.env.BASE_URL;
+
+   ReactDOM.createRoot(document.getElementById('root')!).render(
+     <BrowserRouter basename={basename}>
+       <App />
+     </BrowserRouter>,
+   );
+   ```
+
+   If you skip this, tenant URLs render a blank screen because Router's
+   baked-in basename doesn't match the tenant's actual URL path.
 
 9. **No SSR, no API routes, no server actions.** Static export only.
 
