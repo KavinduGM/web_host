@@ -127,8 +127,16 @@ function escapeAttr(s) {
     .replace(/"/g, '&quot;')
     .replace(/</g, '&lt;');
 }
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
 
 function transformHtmlForTenant(html, cfg, baseUrl, favicon) {
+  let out = html;
+
   // 1. Inject the runtime config + the correct basename for client-side routers.
   const scriptTag =
     `<script>` +
@@ -136,7 +144,6 @@ function transformHtmlForTenant(html, cfg, baseUrl, favicon) {
       `window.__SITE__=${serializeForScript(cfg)};` +
     `</script>`;
 
-  let out = html;
   if (/<\/head>/i.test(out)) {
     out = out.replace(/<\/head>/i, `${scriptTag}</head>`);
   } else if (/<script/i.test(out)) {
@@ -156,5 +163,56 @@ function transformHtmlForTenant(html, cfg, baseUrl, favicon) {
     }
   }
 
+  // 3. Server-side rewrite of <title>, <meta description>, OpenGraph tags,
+  //    and theme-color.  These need to be in the initial HTML response
+  //    (not just updated at runtime) so the browser tab title is correct
+  //    before JS executes, and so LinkedIn / Facebook / WhatsApp link
+  //    previews show the tenant's branding, not the template's.
+
+  const companyName = cfg?.company?.name;
+  const tagline     = cfg?.company?.tagline;
+  const metaTitle   = cfg?.meta?.title || (companyName ? (tagline ? `${companyName} — ${tagline}` : companyName) : null);
+  const metaDesc    = cfg?.meta?.description || tagline;
+  const themeColor  = cfg?.colors?.primary;
+  const ogImage     = cfg?.company?.logo;
+
+  if (metaTitle) {
+    if (/<title>[^<]*<\/title>/i.test(out)) {
+      out = out.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(metaTitle)}</title>`);
+    } else if (/<\/head>/i.test(out)) {
+      out = out.replace(/<\/head>/i, `<title>${escapeHtml(metaTitle)}</title></head>`);
+    }
+  }
+
+  out = upsertMeta(out, 'name', 'description',     metaDesc);
+  out = upsertMeta(out, 'name', 'theme-color',     themeColor);
+  out = upsertMeta(out, 'property', 'og:title',    metaTitle);
+  out = upsertMeta(out, 'property', 'og:description', metaDesc);
+  out = upsertMeta(out, 'property', 'og:image',    ogImage);
+  out = upsertMeta(out, 'name', 'twitter:title',   metaTitle);
+  out = upsertMeta(out, 'name', 'twitter:description', metaDesc);
+  out = upsertMeta(out, 'name', 'twitter:image',   ogImage);
+
   return out;
+}
+
+/**
+ * Replace an existing <meta {attr}="{name}" content="..."> tag, or insert one
+ * before </head> if absent. Skips entirely if value is falsy.
+ */
+function upsertMeta(html, attr, name, value) {
+  if (!value) return html;
+  const tag = `<meta ${attr}="${escapeAttr(name)}" content="${escapeAttr(value)}" />`;
+  // Match a meta tag whose `attr` equals `name`, allowing attribute order to vary.
+  const re = new RegExp(
+    `<meta\\b(?=[^>]*\\b${attr}=["']${name.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')}["'])[^>]*>`,
+    'i',
+  );
+  if (re.test(html)) {
+    return html.replace(re, tag);
+  }
+  if (/<\/head>/i.test(html)) {
+    return html.replace(/<\/head>/i, `${tag}</head>`);
+  }
+  return html;
 }
