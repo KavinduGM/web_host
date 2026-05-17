@@ -105,10 +105,10 @@ else
   # Generate JWT + bcrypt hash
   step "Generating secrets"
   JWT_SECRET=$(openssl rand -hex 32)
-  HASH=$(docker run --rm -e PW="$PW1" -w /tmp node:20-bookworm-slim bash -c \
+  ADMIN_PASSWORD_HASH=$(docker run --rm -e PW="$PW1" -w /tmp node:20-bookworm-slim bash -c \
     'echo "{}" > package.json && npm install bcryptjs >/dev/null 2>&1 && node -e "console.log(require(\"bcryptjs\").hashSync(process.env.PW, 10))"')
   unset PW1 PW2
-  [ -n "$HASH" ] || fail "Failed to hash password"
+  [ -n "$ADMIN_PASSWORD_HASH" ] || fail "Failed to hash password"
   ok "Secrets generated"
 
   # Detect deploy mode
@@ -128,7 +128,7 @@ else
 DOMAIN=$DOMAIN
 DEPLOY_MODE=$DEPLOY_MODE
 JWT_SECRET=$JWT_SECRET
-ADMIN_PASSWORD_HASH='$HASH'
+ADMIN_PASSWORD_HASH='$ADMIN_PASSWORD_HASH'
 EOF
   chmod 600 "$DEPLOY_ENV"
   ok "Saved deployment config to $DEPLOY_ENV (mode 600)"
