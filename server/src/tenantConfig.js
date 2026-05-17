@@ -123,12 +123,19 @@ function pruneEmpty(obj) {
 
 /**
  * Serialize a config object into a safe <script> tag body.
- * Escapes </script> sequences and the LINE SEPARATOR / PARAGRAPH SEPARATOR
- * Unicode codepoints which would otherwise break a <script> block.
+ *
+ * Escapes:
+ *   - "</" sequences so a stray "</script>" inside a string can't close the tag
+ *   - U+2028 / U+2029 line terminators (legal in JSON but illegal in HTML script
+ *     blocks before ES2019 and still problematic for some parsers)
+ *
+ * Note: U+2028 / U+2029 are written as escape sequences inside the regex
+ * literal because the raw characters are line terminators in JS source and
+ * would close the regex prematurely.
  */
 export function serializeForScript(obj) {
   return JSON.stringify(obj)
     .replace(/</g, '\\u003c')
-    .replace(/ /g, '\\u2028')
-    .replace(/ /g, '\\u2029');
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 }
