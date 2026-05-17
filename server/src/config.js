@@ -1,4 +1,4 @@
-import dotenv from 'dotenv';
+import * as dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
 
