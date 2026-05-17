@@ -88,12 +88,17 @@ async function runBuild(demoId) {
     if (cloneCode !== 0) throw new Error(`git clone failed (exit ${cloneCode})`);
 
     append(`\n[build] ${demo.build_cmd}\n`);
+    // Important: do NOT set NODE_ENV=production at this level.
+    // npm ci respects it and skips devDependencies — which means tsc, vite,
+    // webpack, etc. (the things needed to build) don't get installed.
+    // Build tools (vite, webpack) set NODE_ENV=production themselves for the
+    // production bundle. We also strip any inherited NODE_ENV so the install
+    // gets the full dependency tree.
+    const buildEnv = { ...process.env, CI: '1' };
+    delete buildEnv.NODE_ENV;
     const buildCode = await runShell(
       demo.build_cmd,
-      {
-        cwd: workRepo,
-        env: { ...process.env, CI: '1', NODE_ENV: 'production' },
-      },
+      { cwd: workRepo, env: buildEnv },
       append,
     );
     if (buildCode !== 0) throw new Error(`build failed (exit ${buildCode})`);
