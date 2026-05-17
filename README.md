@@ -7,7 +7,48 @@ A self-hosted multi-tenant demo platform.
 1. **One-off demo** — paste a Git URL, pick a slug, get back a public link like `https://demos.yourdomain.com/spil-glass/` that serves the built React site.
 2. **Template + tenants** — build a single React "master template" once, then spawn unlimited re-branded copies (different logo, colors, copy, products) from a UI form, each with its own slug. No extra git repo, no rebuild — tenants are pure runtime overrides.
 
-Designed to run as a single Docker container on Dokploy (or anywhere else).
+Runs as a single Docker container. One command to deploy on a fresh (or existing) VPS.
+
+---
+
+## ⚡ One-command install
+
+SSH into your VPS and run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/KavinduGM/web_host/main/install.sh | sudo bash
+```
+
+You'll be prompted for **(1) your domain** and **(2) an admin password**. The script:
+
+- Installs Docker if missing
+- Clones the repo to `/opt/web-host-tool`
+- Generates a JWT secret + bcrypt-hashes your password
+- Builds the Docker image
+- Creates persistent volumes (`web_host_demos`, `web_host_state`, `web_host_tenants`)
+- **Auto-detects your setup:**
+  - If Dokploy/Traefik is already running on the box → attaches the container to `dokploy-network` with the right Traefik labels (no Dokploy config needed)
+  - Otherwise → runs a Caddy sidecar on :80/:443 with auto Let's Encrypt SSL
+- Starts the container with `restart=unless-stopped`
+
+After ~2 minutes, open `https://<your-domain>/admin` and log in.
+
+### Updating
+
+Re-run the same command (it remembers your config):
+```bash
+sudo bash /opt/web-host-tool/install.sh
+```
+
+### Uninstalling
+
+```bash
+sudo bash /opt/web-host-tool/uninstall.sh
+```
+
+---
+
+The Dockerfile-on-Dokploy path also works (see "Alternative deployment paths" below), but the one-liner is much less fiddly.
 
 ## Concepts
 
@@ -62,7 +103,11 @@ deploy/             Bare-VPS files (nginx + systemd) — only if NOT using Docke
 
 ---
 
-## Deploy on Dokploy
+## Alternative deployment paths
+
+Pick the one-liner above unless you have a reason not to. The Dokploy and bare-VPS paths below are kept for reference.
+
+### Deploy on Dokploy (the long way)
 
 ### 1. Push the code to a Git repo
 You've already done this — Dokploy needs a Git URL to deploy from.
