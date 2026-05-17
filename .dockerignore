@@ -1,7 +1,11 @@
 **/node_modules
 **/dist
+# Block .env files generally…
 **/.env
 **/.env.*
+# …but allow the root .env (Dokploy writes UI Environment Settings here)
+# and any .env.example for reference.
+!.env
 !**/.env.example
 **/data.db
 **/data.db-*

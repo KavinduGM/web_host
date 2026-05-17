@@ -1,5 +1,29 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import fs from 'node:fs';
 import path from 'node:path';
+
+// Load .env from a list of candidate paths, in priority order.
+// Process env (runtime --env-add, docker -e, Dokploy passthrough) always wins —
+// dotenv only sets variables that aren't already defined.
+const candidates = [
+  process.env.DOTENV_PATH,                            // explicit override
+  path.resolve(process.cwd(), '.env'),                // cwd/.env (works when cwd = /app/server)
+  '/app/server/.env',                                 // the place the Dockerfile bakes Dokploy's .env
+  path.resolve(process.cwd(), '..', '.env'),          // project root .env (local dev)
+].filter(Boolean);
+
+const loaded = [];
+for (const file of candidates) {
+  if (fs.existsSync(file)) {
+    const res = dotenv.config({ path: file, override: false });
+    if (!res.error) loaded.push(file);
+  }
+}
+console.log(
+  loaded.length
+    ? `[config] loaded .env from: ${loaded.join(', ')}`
+    : `[config] no .env file found — using process.env only`,
+);
 
 function required(name) {
   const v = process.env[name];
@@ -10,8 +34,9 @@ function required(name) {
     console.error(`\n[config] Missing required env var: ${name}`);
     console.error(`[config] Env vars currently visible to the process:`);
     console.error(`[config]   ${seen.join(', ') || '(none non-system)'}`);
-    console.error(`[config] If "${name}" is not in that list, the runtime isn't passing it in.`);
-    console.error(`[config] In Dokploy: put it under "Environment" (not "Build Arguments") and redeploy.\n`);
+    console.error(`[config] dotenv searched: ${candidates.join(', ')}`);
+    console.error(`[config] dotenv loaded:   ${loaded.length ? loaded.join(', ') : '(none)'}`);
+    console.error(`[config] If "${name}" is missing, check Dokploy's Environment Settings panel saved AND the app was redeployed.\n`);
     throw new Error(`Missing required env var: ${name}`);
   }
   return v;

@@ -56,6 +56,28 @@ COPY --chown=webhost:webhost server/ ./server/
 COPY --from=server-deps --chown=webhost:webhost /app/server/node_modules ./server/node_modules
 COPY --from=client-build --chown=webhost:webhost /app/client/dist ./client/dist
 
+# ---------------------------------------------------------------------------
+# Pick up the runtime .env from the build context root.
+#
+# Dokploy writes the "Environment Settings" UI values to a .env file at the
+# project root inside its application directory — this file is in the build
+# context. We copy it into /app/server/.env so dotenv picks it up at startup
+# (WORKDIR is /app/server, dotenv defaults to cwd/.env).
+#
+# We use .dockerignore as a guaranteed-present anchor so the COPY pattern
+# matches at least one file even when no .env is in the context (e.g. local
+# dev). The .env is then optionally moved into place.
+# ---------------------------------------------------------------------------
+COPY .dockerignore .env* /tmp/dokploy-env/
+RUN if [ -f /tmp/dokploy-env/.env ]; then \
+      echo "[image] Baking .env from build context (Dokploy UI Environment Settings)"; \
+      mv /tmp/dokploy-env/.env /app/server/.env; \
+      chown webhost:webhost /app/server/.env; \
+      chmod 640 /app/server/.env; \
+    else \
+      echo "[image] No .env at build context root — relying on runtime env vars only"; \
+    fi && rm -rf /tmp/dokploy-env
+
 # Persistent paths — mount volumes here in Dokploy:
 #   /data/demos    → built demo sites (served at /<slug>/)
 #   /data/state    → SQLite db + git clone scratch space
