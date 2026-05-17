@@ -24,14 +24,25 @@ You'll be prompted for **(1) your domain** and **(2) an admin password**. The sc
 - Installs Docker if missing
 - Clones the repo to `/opt/web-host-tool`
 - Generates a JWT secret + bcrypt-hashes your password
-- Builds the Docker image
+- **Pulls the pre-built image** from `ghcr.io/kavindugm/web_host:latest` (~20s)
+  — or builds locally as a fallback (~2 min) if the GHCR package isn't public yet
 - Creates persistent volumes (`web_host_demos`, `web_host_state`, `web_host_tenants`)
 - **Auto-detects your setup:**
   - If Dokploy/Traefik is already running on the box → attaches the container to `dokploy-network` with the right Traefik labels (no Dokploy config needed)
   - Otherwise → runs a Caddy sidecar on :80/:443 with auto Let's Encrypt SSL
 - Starts the container with `restart=unless-stopped`
 
-After ~2 minutes, open `https://<your-domain>/admin` and log in.
+After ~20 seconds (pulling pre-built image) or ~2 minutes (first-time local build), open `https://<your-domain>/admin` and log in.
+
+### One-time setup so future pulls are instant
+
+After the very first push to GitHub `main`, a GitHub Action builds and publishes the image to GHCR. By default the package is **private**, so anonymous `docker pull` fails and `install.sh` falls back to a local build. Make it public once and never wait again:
+
+1. Go to <https://github.com/KavinduGM?tab=packages>
+2. Click `web_host`
+3. **Package settings** (right sidebar) → scroll to **Danger Zone** → **Change visibility** → **Public** → confirm
+
+After that, every `install.sh` run (and every future update) just pulls in ~20 seconds.
 
 ### Updating
 

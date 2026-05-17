@@ -32,7 +32,8 @@ APP_DIR="/opt/web-host-tool"
 DEPLOY_ENV="$APP_DIR/.deploy.env"
 CONTAINER_NAME="web-host-tool"
 CADDY_CONTAINER="web-host-tool-caddy"
-IMAGE_NAME="web-host-tool:latest"
+REGISTRY_IMAGE="ghcr.io/kavindugm/web_host:latest"
+LOCAL_IMAGE="web-host-tool:latest"
 INTERNAL_PORT="3001"
 
 # -------- helpers --------------------------------------------------------------
@@ -133,10 +134,19 @@ EOF
   ok "Saved deployment config to $DEPLOY_ENV (mode 600)"
 fi
 
-# -------- build image ---------------------------------------------------------
-step "Building image $IMAGE_NAME (this can take 1-3 min)"
-(cd "$APP_DIR" && docker build --pull -t "$IMAGE_NAME" .)
-ok "Image built"
+# -------- get image (pull from GHCR, fall back to local build) ---------------
+step "Getting image"
+IMAGE_NAME=""
+if docker pull "$REGISTRY_IMAGE" 2>/dev/null; then
+  IMAGE_NAME="$REGISTRY_IMAGE"
+  ok "Pulled pre-built image: $REGISTRY_IMAGE"
+else
+  warn "Pre-built image unavailable (private package or network) — building locally"
+  warn "Tip: see README on how to make the GHCR package public for instant pulls"
+  (cd "$APP_DIR" && docker build --pull -t "$LOCAL_IMAGE" .)
+  IMAGE_NAME="$LOCAL_IMAGE"
+  ok "Built locally: $LOCAL_IMAGE"
+fi
 
 # -------- volumes -------------------------------------------------------------
 step "Ensuring named volumes exist"

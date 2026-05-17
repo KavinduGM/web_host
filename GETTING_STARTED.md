@@ -35,6 +35,11 @@ Copy and paste this exactly:
 curl -fsSL https://raw.githubusercontent.com/KavinduGM/web_host/main/install.sh | sudo bash
 ```
 
+> **First-time-only optional speedup:** the installer pulls a pre-built image from `ghcr.io/kavindugm/web_host:latest`. The first time you run install.sh, this package is private by default — `install.sh` will silently fall back to building locally (~2 min) and works fine. To make every future install/update take ~20 seconds instead, do this once:
+> 1. Go to <https://github.com/KavinduGM?tab=packages>
+> 2. Click `web_host` → **Package settings** → **Change visibility** → **Public**
+> If the package isn't there yet, the Actions workflow hasn't run — check <https://github.com/KavinduGM/web_host/actions>.
+
 It will ask two questions:
 
 1. `Domain (e.g. demos.example.com):` → type **`demos.groovymark.com`** and press Enter
