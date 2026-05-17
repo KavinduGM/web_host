@@ -7,6 +7,7 @@ import { config } from './config.js';
 import './db.js';
 import authRoutes from './routes/auth.js';
 import demoRoutes from './routes/demos.js';
+import tenantRoutes from './routes/tenants.js';
 import { demoServerMiddleware } from './demoServer.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -19,6 +20,7 @@ app.use(cookieParser());
 app.get('/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/demos', demoRoutes);
+app.use('/api/tenants', tenantRoutes);
 
 const clientDist = path.resolve(__dirname, '../../client/dist');
 if (fs.existsSync(clientDist)) {

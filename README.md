@@ -1,8 +1,26 @@
 # Web Host Tool
 
-A self-hosted multi-tenant demo platform. Paste a Git URL, pick a slug, get back a public link like `https://demos.yourdomain.com/spil-glass/` that serves the built React site. Enable/disable/delete demos with one click.
+A self-hosted multi-tenant demo platform.
+
+**Two ways to ship a demo:**
+
+1. **One-off demo** — paste a Git URL, pick a slug, get back a public link like `https://demos.yourdomain.com/spil-glass/` that serves the built React site.
+2. **Template + tenants** — build a single React "master template" once, then spawn unlimited re-branded copies (different logo, colors, copy, products) from a UI form, each with its own slug. No extra git repo, no rebuild — tenants are pure runtime overrides.
 
 Designed to run as a single Docker container on Dokploy (or anywhere else).
+
+## Concepts
+
+| Thing | What it is | How you make it |
+|---|---|---|
+| **Template** (a "demo" in the DB) | A built React site, served at `/<slug>/`. Can stand alone OR act as a master for tenants. | Add via **+ Template** form. Builds from a git repo. |
+| **Tenant** | A re-branded view of a template at its own slug. Same files, but `window.__SITE__` is injected with overrides. | Add via **+ Tenant** form. No git, no build — just fill out the config. |
+
+For templates to support tenants, they must follow the conventions in
+[`TEMPLATE_BUILD_PROMPT.md`](TEMPLATE_BUILD_PROMPT.md) — primarily,
+read everything (company name, logo, colors, copy, products, contact)
+from `src/config/site.ts`, which deep-merges `window.__SITE__` over the
+defaults.
 
 ---
 
@@ -74,6 +92,7 @@ In **Mounts / Volumes**, create two **Volume** mounts (NOT bind mounts unless yo
 |---|---|---|
 | `web-host-demos` | `/data/demos` | Built demo sites (served at `/<slug>/`). If you lose this you can rebuild from Git. |
 | `web-host-state` | `/data/state` | SQLite DB + build scratch space. **Back this up** — it's the only thing you can't rebuild. |
+| `web-host-tenants` | `/data/tenants` | Tenant logos and uploaded images. **Back this up too** — uploads aren't in Git. |
 
 ### 5. Configure the domain
 In **Domains** add `demos.yourdomain.com`, target port `3001`, enable HTTPS (Let's Encrypt). Dokploy's Traefik handles SSL and forwards everything to the container.

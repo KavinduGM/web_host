@@ -59,7 +59,7 @@ COPY --from=client-build --chown=webhost:webhost /app/client/dist ./client/dist
 # Persistent paths — mount volumes here in Dokploy:
 #   /data/demos    → built demo sites (served at /<slug>/)
 #   /data/state    → SQLite db + git clone scratch space
-RUN mkdir -p /data/demos/.disabled /data/state/work \
+RUN mkdir -p /data/demos/.disabled /data/state/work /data/tenants \
     && chown -R webhost:webhost /data
 
 ENV NODE_ENV=production \
@@ -68,6 +68,7 @@ ENV NODE_ENV=production \
     DEMOS_DIR=/data/demos \
     DISABLED_DIR=/data/demos/.disabled \
     WORK_DIR=/data/state/work \
+    TENANTS_DIR=/data/tenants \
     DB_PATH=/data/state/data.db
 
 USER webhost

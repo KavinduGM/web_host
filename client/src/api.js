@@ -34,4 +34,33 @@ export const api = {
   enable: (id) => request(`/demos/${id}/enable`, { method: 'POST' }),
   disable: (id) => request(`/demos/${id}/disable`, { method: 'POST' }),
   getBuildLog: (demoId, buildId) => request(`/demos/${demoId}/builds/${buildId}`),
+
+  // tenants
+  listTenants: () => request('/tenants'),
+  listTenantsByTemplate: (templateId) => request(`/tenants/by-template/${templateId}`),
+  getTenant: (id) => request(`/tenants/${id}`),
+  createTenant: (data) => request('/tenants', { method: 'POST', body: JSON.stringify(data) }),
+  updateTenant: (id, data) => request(`/tenants/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteTenant: (id) => request(`/tenants/${id}`, { method: 'DELETE' }),
+  enableTenant: (id) => request(`/tenants/${id}/enable`, { method: 'POST' }),
+  disableTenant: (id) => request(`/tenants/${id}/disable`, { method: 'POST' }),
+  listTenantUploads: (id) => request(`/tenants/${id}/uploads`),
+  deleteTenantUpload: (id, filename) =>
+    request(`/tenants/${id}/uploads/${encodeURIComponent(filename)}`, { method: 'DELETE' }),
+  uploadTenantFile: async (id, file, kind) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    if (kind) fd.append('kind', kind);
+    const res = await fetch(`/api/tenants/${id}/upload`, {
+      method: 'POST',
+      credentials: 'include',
+      body: fd,
+    });
+    if (!res.ok) {
+      const err = new Error((await res.json().catch(() => ({}))).error || res.statusText);
+      err.status = res.status;
+      throw err;
+    }
+    return res.json();
+  },
 };

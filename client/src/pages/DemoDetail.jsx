@@ -11,11 +11,13 @@ export default function DemoDetail() {
   const [form, setForm] = useState({});
   const [selectedBuildId, setSelectedBuildId] = useState(null);
   const [buildLog, setBuildLog] = useState(null);
+  const [tenants, setTenants] = useState([]);
 
   async function load() {
     try {
       const d = await api.getDemo(id);
       setDemo(d);
+      api.listTenantsByTemplate(id).then(setTenants).catch(() => {});
       if (!selectedBuildId && d.builds.length) {
         setSelectedBuildId(d.builds[0].id);
       }
@@ -170,6 +172,41 @@ export default function DemoDetail() {
               </>
             )}
           </>
+        )}
+      </div>
+
+      <div className="card" style={{ marginTop: 20 }}>
+        <div className="row between">
+          <h2 style={{ margin: 0 }}>Tenants from this template</h2>
+          <Link
+            to={`/tenants/new?template=${demo.id}`}
+            className="btn primary"
+          >+ New tenant</Link>
+        </div>
+        {tenants.length === 0 ? (
+          <div className="muted" style={{ marginTop: 12 }}>
+            No tenants yet. Create one to spin up a re-branded copy of this site (no rebuild required).
+          </div>
+        ) : (
+          <table style={{ marginTop: 12 }}>
+            <thead>
+              <tr><th>Name</th><th>Slug</th><th>URL</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {tenants.map((t) => (
+                <tr key={t.id}>
+                  <td><Link to={`/tenants/${t.id}`}>{t.name}</Link></td>
+                  <td className="mono muted">{t.slug}</td>
+                  <td>
+                    {t.enabled && demo.status === 'ready' ? (
+                      <a href={t.url} target="_blank" rel="noreferrer" className="mono">{t.url}</a>
+                    ) : <span className="muted mono">{t.url}</span>}
+                  </td>
+                  <td>{t.enabled ? <span className="badge ready">live</span> : <span className="badge disabled">disabled</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 

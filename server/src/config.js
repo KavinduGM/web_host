@@ -24,6 +24,7 @@ export const config = {
   demosDir: path.resolve(process.env.DEMOS_DIR || '/var/www/demos'),
   disabledDir: path.resolve(process.env.DISABLED_DIR || '/var/www/demos/.disabled'),
   workDir: path.resolve(process.env.WORK_DIR || '/var/lib/web-host-tool/work'),
+  tenantsDir: path.resolve(process.env.TENANTS_DIR || '/data/tenants'),
   publicBaseUrl: (process.env.PUBLIC_BASE_URL || 'http://localhost:3001').replace(/\/$/, ''),
   dbPath: path.resolve(process.env.DB_PATH || './data.db'),
   buildConcurrency: Number(process.env.BUILD_CONCURRENCY || 1),

@@ -19,7 +19,9 @@ services:
     volumes:
       - demos:/data/demos
       - state:/data/state
+      - tenants:/data/tenants
 
 volumes:
   demos:
   state:
+  tenants:

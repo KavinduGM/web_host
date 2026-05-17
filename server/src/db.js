@@ -36,9 +36,38 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_build_logs_demo ON build_logs(demo_id, started_at DESC);
+
+  -- A tenant is a re-branded view of a template (a 'demo' row).
+  -- Same template files are served, but with window.__SITE__ injected from the tenant's config.
+  CREATE TABLE IF NOT EXISTS tenants (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug        TEXT NOT NULL UNIQUE,
+    name        TEXT NOT NULL,
+    template_id INTEGER NOT NULL REFERENCES demos(id) ON DELETE CASCADE,
+    config      TEXT NOT NULL DEFAULT '{}',  -- JSON blob: SiteConfig overrides
+    enabled     INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_tenants_template ON tenants(template_id);
 `);
 
+// --- helpers for tenant config parsing ---
+function parseTenant(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    enabled: !!row.enabled,
+    config: safeJSON(row.config),
+  };
+}
+function safeJSON(s) {
+  try { return s ? JSON.parse(s) : {}; } catch { return {}; }
+}
+
 export const queries = {
+  // ---- demos / templates ----
   listDemos: db.prepare('SELECT * FROM demos ORDER BY created_at DESC'),
   getDemoById: db.prepare('SELECT * FROM demos WHERE id = ?'),
   getDemoBySlug: db.prepare('SELECT * FROM demos WHERE slug = ?'),
@@ -64,6 +93,8 @@ export const queries = {
     UPDATE demos SET enabled = ?, updated_at = datetime('now') WHERE id = ?
   `),
   deleteDemo: db.prepare('DELETE FROM demos WHERE id = ?'),
+
+  // ---- build logs ----
   insertBuildLog: db.prepare(`
     INSERT INTO build_logs (demo_id, status, log) VALUES (?, 'running', '')
   `),
@@ -78,4 +109,30 @@ export const queries = {
     WHERE demo_id = ? ORDER BY started_at DESC LIMIT 20
   `),
   getBuildLog: db.prepare('SELECT * FROM build_logs WHERE id = ?'),
+
+  // ---- tenants ----
+  listAllTenants: () =>
+    db.prepare('SELECT * FROM tenants ORDER BY created_at DESC').all().map(parseTenant),
+  listTenantsByTemplate: (templateId) =>
+    db.prepare('SELECT * FROM tenants WHERE template_id = ? ORDER BY created_at DESC')
+      .all(templateId).map(parseTenant),
+  getTenantById: (id) =>
+    parseTenant(db.prepare('SELECT * FROM tenants WHERE id = ?').get(id)),
+  getTenantBySlug: (slug) =>
+    parseTenant(db.prepare('SELECT * FROM tenants WHERE slug = ?').get(slug)),
+  insertTenant: db.prepare(`
+    INSERT INTO tenants (slug, name, template_id, config)
+    VALUES (@slug, @name, @template_id, @config)
+  `),
+  updateTenant: db.prepare(`
+    UPDATE tenants SET
+      name = @name,
+      config = @config,
+      updated_at = datetime('now')
+    WHERE id = @id
+  `),
+  setTenantEnabled: db.prepare(`
+    UPDATE tenants SET enabled = ?, updated_at = datetime('now') WHERE id = ?
+  `),
+  deleteTenant: db.prepare('DELETE FROM tenants WHERE id = ?'),
 };

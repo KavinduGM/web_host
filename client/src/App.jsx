@@ -5,6 +5,8 @@ import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import NewDemo from './pages/NewDemo.jsx';
 import DemoDetail from './pages/DemoDetail.jsx';
+import Tenants from './pages/Tenants.jsx';
+import TenantEditor from './pages/TenantEditor.jsx';
 
 export default function App() {
   const [authed, setAuthed] = useState(null);
@@ -30,6 +32,9 @@ export default function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/new" element={<NewDemo />} />
         <Route path="/demos/:id" element={<DemoDetail />} />
+        <Route path="/tenants" element={<Tenants />} />
+        <Route path="/tenants/new" element={<TenantEditor />} />
+        <Route path="/tenants/:id" element={<TenantEditor />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
@@ -48,8 +53,10 @@ function Topbar({ onLogout }) {
       <div className="row gap-sm">
         <div className="brand">Demo Host</div>
         <nav style={{ marginLeft: 24 }}>
-          <NavLink to="/" end>Dashboard</NavLink>
-          <NavLink to="/new">New demo</NavLink>
+          <NavLink to="/" end>Templates</NavLink>
+          <NavLink to="/tenants">Tenants</NavLink>
+          <NavLink to="/new">+ Template</NavLink>
+          <NavLink to="/tenants/new">+ Tenant</NavLink>
         </nav>
       </div>
       <button className="btn" onClick={logout}>Sign out</button>
