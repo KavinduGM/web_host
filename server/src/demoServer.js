@@ -11,13 +11,35 @@ const RESERVED = new Set([
   'admin', 'api', 'health', 'static', 'assets', 'login', 'logout', '_next', 'public',
 ]);
 
+// File extensions whose CONTENT can contain "/<template-slug>/" strings that
+// must be rewritten to "/<tenant-slug>/" so a tenant's React Router basename,
+// Vite preload paths, dynamic-import chunks, source maps, etc. resolve under
+// the tenant URL even when the template was built with the template slug
+// baked in (via `PUBLIC_BASE_PATH=/<template-slug>/`).
+const REWRITABLE_TEXT_EXT = /\.(?:m?js|css|map|html|json|svg|webmanifest)$/i;
+
+const CONTENT_TYPE_BY_EXT = {
+  '.js':          'application/javascript; charset=utf-8',
+  '.mjs':         'application/javascript; charset=utf-8',
+  '.css':         'text/css; charset=utf-8',
+  '.map':         'application/json; charset=utf-8',
+  '.html':        'text/html; charset=utf-8',
+  '.json':        'application/json; charset=utf-8',
+  '.svg':         'image/svg+xml; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+};
+
 /**
  * Routing model:
  *   /<slug>/__tenant__/uploads/<file>  → serve from /data/tenants/<slug>/uploads/
  *   /<slug>/                           → if slug is a tenant: serve template's files,
  *                                         injecting window.__SITE__ into index.html
+ *                                         AND rewriting "/<template-slug>/" to
+ *                                         "/<tenant-slug>/" in HTML + bundled JS/CSS
  *                                       → if slug is a template (demo): serve as-is
- *   /<slug>/<asset>                    → serve template's static asset
+ *   /<slug>/<asset>                    → serve template's static asset, rewriting
+ *                                         the template-slug string in text assets
+ *                                         when serving in tenant context.
  *
  * SPA fallback applies in all cases — unknown paths under a slug fall back to
  * that slug's index.html (with the same injection if it's a tenant).
@@ -34,6 +56,7 @@ export function demoServerMiddleware() {
     const tenant = queries.getTenantBySlug(slug);
     let filesDir;
     let activeTenant = null;
+    let templateSlug = null;
 
     if (tenant) {
       if (!tenant.enabled) return next();
@@ -41,6 +64,7 @@ export function demoServerMiddleware() {
       if (!template) return next();
       filesDir = path.join(config.demosDir, template.slug);
       activeTenant = tenant;
+      templateSlug = template.slug;
     } else {
       // Not a tenant — try plain demo/template
       const demo = queries.getDemoBySlug.get(slug);
@@ -77,7 +101,31 @@ export function demoServerMiddleware() {
     const isFile = await stat(candidate).then((s) => s?.isFile()).catch(() => false);
 
     if (isFile && !candidate.endsWith('index.html')) {
-      // Static asset — let express.static handle it (proper headers, etc.)
+      const ext = path.extname(candidate).toLowerCase();
+
+      // In tenant context, rewrite "/<template-slug>/" → "/<tenant-slug>/" inside
+      // text assets (JS bundle, CSS, source maps, etc).  This makes templates
+      // that bake `import.meta.env.BASE_URL` as a literal (the default Vite
+      // pattern) work for tenants without rebuilding — the React Router
+      // basename, dynamic-import chunk URLs, and CSS asset URLs all end up
+      // pointing at the tenant slug.
+      if (activeTenant && REWRITABLE_TEXT_EXT.test(candidate)) {
+        try {
+          const content = await fsp.readFile(candidate, 'utf8');
+          const rewritten = rewriteSlugPaths(content, templateSlug, activeTenant.slug);
+          res.setHeader('Content-Type', CONTENT_TYPE_BY_EXT[ext] || 'application/octet-stream');
+          // Per-tenant content → don't share across tenants and don't mark
+          // immutable (the underlying file's name is hash-stable, but the
+          // rewritten body differs per tenant).
+          res.setHeader('Cache-Control', 'private, max-age=300');
+          return res.send(rewritten);
+        } catch (err) {
+          console.error('[demoServer] rewrite failed:', err);
+          // Fall through to plain static serve on read failure.
+        }
+      }
+
+      // Static asset (binary or non-tenant context) — let express.static handle it.
       req.url = subPath;
       const staticHandler = express.static(filesDir, {
         fallthrough: false,
@@ -108,7 +156,9 @@ export function demoServerMiddleware() {
       const html = await fsp.readFile(indexPath, 'utf8');
       const tenantBase = `/${activeTenant.slug}/`;
       const favicon = activeTenant.config?.company?.favicon;
-      const injected = transformHtmlForTenant(html, activeTenant.config, tenantBase, favicon);
+      const injected = transformHtmlForTenant(
+        html, activeTenant.config, tenantBase, favicon, templateSlug, activeTenant.slug,
+      );
       return res.send(injected);
     } catch (err) {
       console.error('[demoServer] inject failed:', err);
@@ -134,7 +184,24 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;');
 }
 
-function transformHtmlForTenant(html, cfg, baseUrl, favicon) {
+/**
+ * Replace every "/<templateSlug>/" occurrence with "/<tenantSlug>/" in a text
+ * body. Used for both HTML rewriting and bundled JS/CSS content rewriting so
+ * that the template's baked-in base path (from Vite's `PUBLIC_BASE_PATH`)
+ * becomes the tenant's base path at serve time.
+ *
+ * The pattern is anchored with a leading "/" and trailing "/" so partial-word
+ * matches in user copy (e.g. a product description that happens to contain
+ * the slug substring) are not affected.
+ */
+function rewriteSlugPaths(text, templateSlug, tenantSlug) {
+  if (!templateSlug || !tenantSlug || templateSlug === tenantSlug) return text;
+  const escaped = templateSlug.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+  const re = new RegExp(`/${escaped}/`, 'g');
+  return text.replace(re, `/${tenantSlug}/`);
+}
+
+function transformHtmlForTenant(html, cfg, baseUrl, favicon, templateSlug, tenantSlug) {
   let out = html;
 
   // 1. Inject the runtime config + the correct basename for client-side routers.
@@ -200,6 +267,15 @@ function transformHtmlForTenant(html, cfg, baseUrl, favicon) {
   out = upsertMeta(out, 'name', 'twitter:title',   metaTitle);
   out = upsertMeta(out, 'name', 'twitter:description', metaDesc);
   out = upsertMeta(out, 'name', 'twitter:image',   ogImage);
+
+  // 4. Rewrite "/<template-slug>/" → "/<tenant-slug>/" everywhere in the HTML
+  //    (script src, link href, modulepreload, etc.) so all asset URLs route
+  //    back through the tenant slug.  Asset requests under the tenant slug
+  //    fall back to the template's filesDir (see static branch above) AND
+  //    get the same content rewrite for text bodies.  Net effect: a template
+  //    built with PUBLIC_BASE_PATH=/<template-slug>/ works for tenants
+  //    without any template-side code change.
+  out = rewriteSlugPaths(out, templateSlug, tenantSlug);
 
   return out;
 }
