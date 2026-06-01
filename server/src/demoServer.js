@@ -138,13 +138,21 @@ function transformHtmlForTenant(html, cfg, baseUrl, favicon) {
   let out = html;
 
   // 1. Inject the runtime config + the correct basename for client-side routers.
+  //    MUST land as the first child of <head> so it executes before any other
+  //    script in the document — including non-module inline scripts (Vite's
+  //    modulepreload polyfill, analytics snippets, template bootstrap, etc.)
+  //    that would otherwise see `window.__SITE__`/`__BASE_URL__` as undefined.
+  //    Module scripts are deferred so they'd run after either position, but
+  //    classic <script> tags execute synchronously at parse time.
   const scriptTag =
     `<script>` +
       `window.__BASE_URL__=${JSON.stringify(baseUrl)};` +
       `window.__SITE__=${serializeForScript(cfg)};` +
     `</script>`;
 
-  if (/<\/head>/i.test(out)) {
+  if (/<head\b[^>]*>/i.test(out)) {
+    out = out.replace(/<head\b[^>]*>/i, (m) => m + scriptTag);
+  } else if (/<\/head>/i.test(out)) {
     out = out.replace(/<\/head>/i, `${scriptTag}</head>`);
   } else if (/<script/i.test(out)) {
     out = out.replace(/<script/i, `${scriptTag}<script`);
@@ -157,9 +165,9 @@ function transformHtmlForTenant(html, cfg, baseUrl, favicon) {
     const newLink = `<link rel="icon" href="${escapeAttr(favicon)}" />`;
     const linkRegex = /<link\b[^>]*\brel=["']?(?:icon|shortcut icon)["']?[^>]*>/i;
     if (linkRegex.test(out)) {
-      out = out.replace(linkRegex, newLink);
+      out = replaceLiteral(out, linkRegex, newLink);
     } else if (/<\/head>/i.test(out)) {
-      out = out.replace(/<\/head>/i, `${newLink}</head>`);
+      out = replaceLiteral(out, /<\/head>/i, `${newLink}</head>`);
     }
   }
 
@@ -178,9 +186,9 @@ function transformHtmlForTenant(html, cfg, baseUrl, favicon) {
 
   if (metaTitle) {
     if (/<title>[^<]*<\/title>/i.test(out)) {
-      out = out.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(metaTitle)}</title>`);
+      out = replaceLiteral(out, /<title>[^<]*<\/title>/i, `<title>${escapeHtml(metaTitle)}</title>`);
     } else if (/<\/head>/i.test(out)) {
-      out = out.replace(/<\/head>/i, `<title>${escapeHtml(metaTitle)}</title></head>`);
+      out = replaceLiteral(out, /<\/head>/i, `<title>${escapeHtml(metaTitle)}</title></head>`);
     }
   }
 
@@ -197,6 +205,17 @@ function transformHtmlForTenant(html, cfg, baseUrl, favicon) {
 }
 
 /**
+ * String.prototype.replace interprets $& / $1 / $$ etc. in the replacement
+ * string as backreferences.  Tenant config values can legitimately contain $
+ * (URL query params, prices, copy text) — passing those through verbatim
+ * mangles the output.  This wrapper passes a function so the replacement is
+ * treated as a literal.
+ */
+function replaceLiteral(html, re, replacement) {
+  return html.replace(re, () => replacement);
+}
+
+/**
  * Replace an existing <meta {attr}="{name}" content="..."> tag, or insert one
  * before </head> if absent. Skips entirely if value is falsy.
  */
@@ -209,10 +228,10 @@ function upsertMeta(html, attr, name, value) {
     'i',
   );
   if (re.test(html)) {
-    return html.replace(re, tag);
+    return replaceLiteral(html, re, tag);
   }
   if (/<\/head>/i.test(html)) {
-    return html.replace(/<\/head>/i, `${tag}</head>`);
+    return replaceLiteral(html, /<\/head>/i, `${tag}</head>`);
   }
   return html;
 }
