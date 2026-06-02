@@ -55,6 +55,30 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_tenants_template ON tenants(template_id);
+
+  -- "Claim This Website" widget submissions from any served demo (template
+  -- or tenant).  Captured from the public widget so admins can follow up.
+  CREATE TABLE IF NOT EXISTS inquiries (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_kind  TEXT NOT NULL,                  -- 'template' | 'tenant'
+    source_id    INTEGER,                        -- demos.id or tenants.id (nullable in case row was deleted later)
+    source_slug  TEXT NOT NULL,                  -- the slug under which the widget was served
+    source_name  TEXT NOT NULL,                  -- display name at submit time (denormalized so it survives a rename)
+    name         TEXT NOT NULL,
+    email        TEXT NOT NULL,
+    phone        TEXT,
+    message      TEXT,
+    referer      TEXT,                           -- full URL the visitor was on
+    user_agent   TEXT,
+    ip           TEXT,
+    status       TEXT NOT NULL DEFAULT 'new',    -- new | contacted | closed
+    notes        TEXT,                           -- admin notes
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_inquiries_created ON inquiries(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_inquiries_status  ON inquiries(status);
 `);
 
 // Migration: add `defaults` column to existing demos tables that pre-date it.
@@ -158,4 +182,21 @@ export const queries = {
     UPDATE tenants SET enabled = ?, updated_at = datetime('now') WHERE id = ?
   `),
   deleteTenant: db.prepare('DELETE FROM tenants WHERE id = ?'),
+
+  // ---- inquiries ----
+  insertInquiry: db.prepare(`
+    INSERT INTO inquiries
+      (source_kind, source_id, source_slug, source_name, name, email, phone, message, referer, user_agent, ip)
+    VALUES
+      (@source_kind, @source_id, @source_slug, @source_name, @name, @email, @phone, @message, @referer, @user_agent, @ip)
+  `),
+  listInquiries: db.prepare(`SELECT * FROM inquiries ORDER BY created_at DESC LIMIT 500`),
+  getInquiry:    db.prepare(`SELECT * FROM inquiries WHERE id = ?`),
+  setInquiryStatus: db.prepare(`
+    UPDATE inquiries SET status = ?, notes = COALESCE(?, notes), updated_at = datetime('now') WHERE id = ?
+  `),
+  deleteInquiry: db.prepare(`DELETE FROM inquiries WHERE id = ?`),
+  countInquiriesByStatus: db.prepare(`
+    SELECT status, COUNT(*) as n FROM inquiries GROUP BY status
+  `),
 };

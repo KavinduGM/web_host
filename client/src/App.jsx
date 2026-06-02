@@ -7,6 +7,7 @@ import NewDemo from './pages/NewDemo.jsx';
 import DemoDetail from './pages/DemoDetail.jsx';
 import Tenants from './pages/Tenants.jsx';
 import TenantEditor from './pages/TenantEditor.jsx';
+import Inquiries from './pages/Inquiries.jsx';
 
 export default function App() {
   const [authed, setAuthed] = useState(null);
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/tenants" element={<Tenants />} />
         <Route path="/tenants/new" element={<TenantEditor />} />
         <Route path="/tenants/:id" element={<TenantEditor />} />
+        <Route path="/inquiries" element={<Inquiries />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
@@ -43,6 +45,22 @@ export default function App() {
 
 function Topbar({ onLogout }) {
   const nav = useNavigate();
+  const [newCount, setNewCount] = useState(0);
+
+  // Poll the inquiry count so the topbar shows a live "new" badge.
+  useEffect(() => {
+    let cancelled = false;
+    async function poll() {
+      try {
+        const d = await api.listInquiries();
+        if (!cancelled) setNewCount(d.counts?.new || 0);
+      } catch { /* ignore */ }
+    }
+    poll();
+    const t = setInterval(poll, 15_000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
+
   async function logout() {
     await api.logout().catch(() => {});
     onLogout();
@@ -55,6 +73,25 @@ function Topbar({ onLogout }) {
         <nav style={{ marginLeft: 24 }}>
           <NavLink to="/" end>Templates</NavLink>
           <NavLink to="/tenants">Tenants</NavLink>
+          <NavLink to="/inquiries">
+            Inquiries
+            {newCount > 0 && (
+              <span
+                className="badge"
+                style={{
+                  marginLeft: 6,
+                  background: '#a78bfa',
+                  color: '#0c0f14',
+                  padding: '1px 7px',
+                  fontSize: 10,
+                  borderRadius: 999,
+                  fontWeight: 700,
+                }}
+              >
+                {newCount}
+              </span>
+            )}
+          </NavLink>
           <NavLink to="/new">+ Template</NavLink>
           <NavLink to="/tenants/new">+ Tenant</NavLink>
         </nav>

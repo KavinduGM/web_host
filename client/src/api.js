@@ -50,6 +50,12 @@ export const api = {
   listTenantUploads: (id) => request(`/tenants/${id}/uploads`),
   deleteTenantUpload: (id, filename) =>
     request(`/tenants/${id}/uploads/${encodeURIComponent(filename)}`, { method: 'DELETE' }),
+  // inquiries (admin views)
+  listInquiries: () => request('/inquiries'),
+  getInquiry: (id) => request(`/inquiries/${id}`),
+  updateInquiry: (id, data) => request(`/inquiries/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteInquiry: (id) => request(`/inquiries/${id}`, { method: 'DELETE' }),
+
   uploadTenantFile: async (id, file, kind) => {
     const fd = new FormData();
     fd.append('file', file);

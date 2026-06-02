@@ -56,6 +56,7 @@ export function demoServerMiddleware() {
     const tenant = queries.getTenantBySlug(slug);
     let filesDir;
     let activeTenant = null;
+    let activeDemo = null;
     let templateSlug = null;
     let templateDefaults = {};
 
@@ -73,6 +74,7 @@ export function demoServerMiddleware() {
       const demo = queries.getDemoBySlug.get(slug);
       if (!demo) return next();
       filesDir = path.join(config.demosDir, slug);
+      activeDemo = demo;
     }
 
     if (!fs.existsSync(filesDir)) return next();
@@ -153,22 +155,26 @@ export function demoServerMiddleware() {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
 
-    if (!activeTenant) {
-      // Plain template, no injection.
-      return res.sendFile(indexPath);
-    }
-
-    // Tenant: inject window.__SITE__ + window.__BASE_URL__ into the HTML,
-    // and rewrite the <link rel="icon"> if the tenant supplied a favicon.
     try {
       const html = await fsp.readFile(indexPath, 'utf8');
-      const tenantBase = `/${activeTenant.slug}/`;
-      const favicon = activeTenant.config?.company?.favicon;
-      const injected = transformHtmlForTenant(
-        html, activeTenant.config, tenantBase, favicon,
-        templateSlug, activeTenant.slug, templateDefaults,
+      let out = html;
+      if (activeTenant) {
+        // Tenant: inject window.__SITE__ + window.__BASE_URL__, rewrite favicon,
+        // rewrite slug paths, substitute template-default strings.
+        const tenantBase = `/${activeTenant.slug}/`;
+        const favicon = activeTenant.config?.company?.favicon;
+        out = transformHtmlForTenant(
+          out, activeTenant.config, tenantBase, favicon,
+          templateSlug, activeTenant.slug, templateDefaults,
+        );
+      }
+      // Always inject the "Claim This Website" widget on top of whatever
+      // transforms were done above (tenant or plain template).
+      out = injectClaimWidget(out, activeTenant
+        ? { kind: 'tenant', id: activeTenant.id, slug: activeTenant.slug, name: activeTenant.name }
+        : { kind: 'template', id: activeDemo?.id, slug: slug, name: activeDemo?.name || slug }
       );
-      return res.send(injected);
+      return res.send(out);
     } catch (err) {
       console.error('[demoServer] inject failed:', err);
       return res.sendFile(indexPath);
@@ -371,6 +377,32 @@ function applySubstitutions(text, pairs) {
  */
 function replaceLiteral(html, re, replacement) {
   return html.replace(re, () => replacement);
+}
+
+/**
+ * Inject the "Claim This Website" widget loader + per-page context.
+ * The context tells the widget which template/tenant submitted the inquiry
+ * (kind, id, slug, display name) so admins can see who's interested in what.
+ *
+ * The loader script is appended just before </body> so the widget doesn't
+ * compete with the page's own scripts for initial paint.
+ */
+function injectClaimWidget(html, source) {
+  const ctxJson = serializeForScript({
+    source_kind: source.kind,
+    source_id:   source.id ?? null,
+    source_slug: source.slug,
+    source_name: source.name,
+  });
+  const snippet =
+    `<script>window.__CLAIM_WIDGET_CTX__=${ctxJson};</script>` +
+    `<script src="/__widget__/widget.js" async></script>`;
+
+  if (/<\/body>/i.test(html)) {
+    return html.replace(/<\/body>/i, () => `${snippet}</body>`);
+  }
+  // No </body> — append to end of document.
+  return html + snippet;
 }
 
 /**

@@ -8,6 +8,7 @@ import './db.js';
 import authRoutes from './routes/auth.js';
 import demoRoutes from './routes/demos.js';
 import tenantRoutes from './routes/tenants.js';
+import inquiryRoutes from './routes/inquiries.js';
 import { demoServerMiddleware } from './demoServer.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -18,9 +19,20 @@ app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
 app.get('/health', (req, res) => res.json({ ok: true }));
+
+// Public "claim this website" widget JS — served to every demo page.
+// Lives under /__widget__/ so the slug regex in demoServer won't match it
+// (slugs must start with [a-z0-9], not '_').
+app.get('/__widget__/widget.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.sendFile(path.resolve(__dirname, 'widget.js'));
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/demos', demoRoutes);
 app.use('/api/tenants', tenantRoutes);
+app.use('/api/inquiries', inquiryRoutes);
 
 const clientDist = path.resolve(__dirname, '../../client/dist');
 if (fs.existsSync(clientDist)) {
