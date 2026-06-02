@@ -57,6 +57,7 @@ export function demoServerMiddleware() {
     let filesDir;
     let activeTenant = null;
     let templateSlug = null;
+    let templateDefaults = {};
 
     if (tenant) {
       if (!tenant.enabled) return next();
@@ -65,6 +66,8 @@ export function demoServerMiddleware() {
       filesDir = path.join(config.demosDir, template.slug);
       activeTenant = tenant;
       templateSlug = template.slug;
+      try { templateDefaults = template.defaults ? JSON.parse(template.defaults) : {}; }
+      catch { templateDefaults = {}; }
     } else {
       // Not a tenant — try plain demo/template
       const demo = queries.getDemoBySlug.get(slug);
@@ -109,10 +112,15 @@ export function demoServerMiddleware() {
       // pattern) work for tenants without rebuilding — the React Router
       // basename, dynamic-import chunk URLs, and CSS asset URLs all end up
       // pointing at the tenant slug.
+      //
+      // Additionally, substitute any template-default strings (company name,
+      // contact info, etc.) with the tenant's overriding values so even
+      // hardcoded JSX strings in the template bundle pick up tenant branding.
       if (activeTenant && REWRITABLE_TEXT_EXT.test(candidate)) {
         try {
           const content = await fsp.readFile(candidate, 'utf8');
-          const rewritten = rewriteSlugPaths(content, templateSlug, activeTenant.slug);
+          let rewritten = rewriteSlugPaths(content, templateSlug, activeTenant.slug);
+          rewritten = applySubstitutions(rewritten, buildSubstitutions(templateDefaults, activeTenant.config));
           res.setHeader('Content-Type', CONTENT_TYPE_BY_EXT[ext] || 'application/octet-stream');
           // Per-tenant content → don't share across tenants and don't mark
           // immutable (the underlying file's name is hash-stable, but the
@@ -157,7 +165,8 @@ export function demoServerMiddleware() {
       const tenantBase = `/${activeTenant.slug}/`;
       const favicon = activeTenant.config?.company?.favicon;
       const injected = transformHtmlForTenant(
-        html, activeTenant.config, tenantBase, favicon, templateSlug, activeTenant.slug,
+        html, activeTenant.config, tenantBase, favicon,
+        templateSlug, activeTenant.slug, templateDefaults,
       );
       return res.send(injected);
     } catch (err) {
@@ -201,7 +210,7 @@ function rewriteSlugPaths(text, templateSlug, tenantSlug) {
   return text.replace(re, `/${tenantSlug}/`);
 }
 
-function transformHtmlForTenant(html, cfg, baseUrl, favicon, templateSlug, tenantSlug) {
+function transformHtmlForTenant(html, cfg, baseUrl, favicon, templateSlug, tenantSlug, templateDefaults) {
   let out = html;
 
   // 1. Inject the runtime config + the correct basename for client-side routers.
@@ -277,6 +286,79 @@ function transformHtmlForTenant(html, cfg, baseUrl, favicon, templateSlug, tenan
   //    without any template-side code change.
   out = rewriteSlugPaths(out, templateSlug, tenantSlug);
 
+  // 5. Substitute template-default strings (company name, contact email/phone/
+  //    address, hero copy, social URLs, etc.) with the tenant's overriding
+  //    values.  This catches anything the template hardcoded in JSX/HTML that
+  //    wasn't wired through `site.*` — without it, places like the footer
+  //    copyright or hero headline can still show the template's brand text
+  //    even when the tenant supplies its own.
+  out = applySubstitutions(out, buildSubstitutions(templateDefaults, cfg));
+
+  return out;
+}
+
+/**
+ * Build an ordered list of {from, to} string-substitution pairs by walking
+ * the template's defaults and the tenant's config in lockstep.  For every
+ * leaf string in `defaults` that has a matching non-empty, different leaf
+ * in `tenant`, emit a pair so the template's baked-in string is replaced
+ * with the tenant's value.
+ *
+ * Same default value reachable through multiple paths (e.g. company.name
+ * mentioned in footer.copyright too) is emitted once per occurrence in the
+ * tree but de-duplicated before returning.
+ *
+ * Results are sorted by `from` length DESCENDING so longer strings replace
+ * before any shorter substrings of them — prevents partial-overlap bugs
+ * (e.g. "Novatec Glass Industries" must replace before "Novatec Glass").
+ */
+function buildSubstitutions(defaults, tenant) {
+  const pairs = [];
+  walk(defaults, tenant, pairs);
+  // De-dup on `from`, keep first `to` we saw.
+  const seen = new Map();
+  for (const p of pairs) {
+    if (!seen.has(p.from)) seen.set(p.from, p.to);
+  }
+  return [...seen.entries()]
+    .map(([from, to]) => ({ from, to }))
+    // Skip same-value pairs (no rewrite needed) and tiny strings (would
+    // produce far too many spurious matches inside the JS bundle).
+    .filter(({ from, to }) => from !== to && from.length >= 3)
+    .sort((a, b) => b.from.length - a.from.length);
+}
+
+function walk(dflt, override, out) {
+  if (Array.isArray(dflt)) {
+    if (!Array.isArray(override)) return;
+    const n = Math.min(dflt.length, override.length);
+    for (let i = 0; i < n; i++) walk(dflt[i], override[i], out);
+    return;
+  }
+  if (dflt && typeof dflt === 'object') {
+    if (!override || typeof override !== 'object') return;
+    for (const k of Object.keys(dflt)) {
+      if (k in override) walk(dflt[k], override[k], out);
+    }
+    return;
+  }
+  if (typeof dflt === 'string' && typeof override === 'string') {
+    const from = dflt.trim();
+    const to   = override.trim();
+    if (from && to) out.push({ from, to });
+  }
+}
+
+function applySubstitutions(text, pairs) {
+  if (!pairs.length) return text;
+  let out = text;
+  for (const { from, to } of pairs) {
+    // Plain string replace-all: keep things conservative — no regex word
+    // boundary check, so we DO replace substrings.  In practice the
+    // template-defaults strings are distinctive (company name, full email,
+    // full phone) so collisions are rare.
+    out = out.split(from).join(to);
+  }
   return out;
 }
 

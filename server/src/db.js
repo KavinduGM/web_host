@@ -22,6 +22,10 @@ db.exec(`
     enabled       INTEGER NOT NULL DEFAULT 1,
     last_build_at TEXT,
     last_error    TEXT,
+    defaults      TEXT NOT NULL DEFAULT '{}',  -- JSON blob: SiteConfig values that the template has BAKED IN.
+                                                -- Used at tenant-serve time to substitute each baked-in
+                                                -- string with the tenant's overriding value across HTML
+                                                -- and bundled JS/CSS.
     created_at    TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -53,6 +57,14 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tenants_template ON tenants(template_id);
 `);
 
+// Migration: add `defaults` column to existing demos tables that pre-date it.
+// CREATE TABLE IF NOT EXISTS leaves the schema alone if the table exists, so
+// existing deployments won't get the new column from the DDL above.
+const demoCols = db.prepare(`PRAGMA table_info(demos)`).all().map((c) => c.name);
+if (!demoCols.includes('defaults')) {
+  db.exec(`ALTER TABLE demos ADD COLUMN defaults TEXT NOT NULL DEFAULT '{}'`);
+}
+
 // --- helpers for tenant config parsing ---
 function parseTenant(row) {
   if (!row) return null;
@@ -60,6 +72,14 @@ function parseTenant(row) {
     ...row,
     enabled: !!row.enabled,
     config: safeJSON(row.config),
+  };
+}
+export function parseDemo(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    enabled: !!row.enabled,
+    defaults: safeJSON(row.defaults),
   };
 }
 function safeJSON(s) {
@@ -91,6 +111,9 @@ export const queries = {
   `),
   setDemoEnabled: db.prepare(`
     UPDATE demos SET enabled = ?, updated_at = datetime('now') WHERE id = ?
+  `),
+  setDemoDefaults: db.prepare(`
+    UPDATE demos SET defaults = ?, updated_at = datetime('now') WHERE id = ?
   `),
   deleteDemo: db.prepare('DELETE FROM demos WHERE id = ?'),
 

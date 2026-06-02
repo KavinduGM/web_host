@@ -31,6 +31,9 @@ export const api = {
   updateDemo: (id, data) => request(`/demos/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteDemo: (id) => request(`/demos/${id}`, { method: 'DELETE' }),
   rebuild: (id) => request(`/demos/${id}/rebuild`, { method: 'POST' }),
+  setDemoDefaults: (id, defaults) => request(`/demos/${id}/defaults`, {
+    method: 'PUT', body: JSON.stringify(defaults),
+  }),
   enable: (id) => request(`/demos/${id}/enable`, { method: 'POST' }),
   disable: (id) => request(`/demos/${id}/disable`, { method: 'POST' }),
   getBuildLog: (demoId, buildId) => request(`/demos/${demoId}/builds/${buildId}`),

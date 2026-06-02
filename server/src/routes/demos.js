@@ -5,6 +5,7 @@ import { queries } from '../db.js';
 import { validateSlug } from '../slug.js';
 import { enqueueBuild } from '../builder.js';
 import { deleteDemoFiles, disableDemo, enableDemo } from '../fsops.js';
+import { normalizeConfig } from '../tenantConfig.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -15,7 +16,12 @@ function serialize(demo) {
     ...demo,
     enabled: !!demo.enabled,
     url: `${config.publicBaseUrl}/${demo.slug}/`,
+    defaults: safeJSON(demo.defaults),
   };
+}
+function safeJSON(s) {
+  if (s && typeof s === 'object') return s;
+  try { return s ? JSON.parse(s) : {}; } catch { return {}; }
 }
 
 router.get('/', (req, res) => {
@@ -89,6 +95,18 @@ router.patch('/:id', (req, res) => {
     build_cmd,
     output_dir,
   });
+  res.json(serialize(queries.getDemoById.get(demo.id)));
+});
+
+// Update the template's "defaults" — the SiteConfig values currently baked
+// into the built bundle.  These are what get string-substituted at tenant
+// serve time so each tenant sees its own values instead of the template's
+// original branding/contact info.
+router.put('/:id/defaults', (req, res) => {
+  const demo = queries.getDemoById.get(req.params.id);
+  if (!demo) return res.status(404).json({ error: 'not found' });
+  const cleanCfg = normalizeConfig(req.body || {});
+  queries.setDemoDefaults.run(JSON.stringify(cleanCfg), demo.id);
   res.json(serialize(queries.getDemoById.get(demo.id)));
 });
 

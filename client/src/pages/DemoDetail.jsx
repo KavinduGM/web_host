@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
+import SiteConfigForm, { BLANK_SITE_CONFIG, deepFill } from '../components/SiteConfigForm.jsx';
 
 export default function DemoDetail() {
   const { id } = useParams();
@@ -12,6 +13,9 @@ export default function DemoDetail() {
   const [selectedBuildId, setSelectedBuildId] = useState(null);
   const [buildLog, setBuildLog] = useState(null);
   const [tenants, setTenants] = useState([]);
+  const [defaults, setDefaults] = useState(BLANK_SITE_CONFIG);
+  const [defaultsDirty, setDefaultsDirty] = useState(false);
+  const [savingDefaults, setSavingDefaults] = useState(false);
 
   async function load() {
     try {
@@ -30,8 +34,25 @@ export default function DemoDetail() {
           output_dir: d.output_dir,
         });
       }
+      if (!defaultsDirty) {
+        setDefaults(deepFill(BLANK_SITE_CONFIG, d.defaults || {}));
+      }
     } catch (e) {
       setErr(e.message);
+    }
+  }
+
+  async function saveDefaults() {
+    setErr('');
+    setSavingDefaults(true);
+    try {
+      await api.setDemoDefaults(id, defaults);
+      setDefaultsDirty(false);
+      load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSavingDefaults(false);
     }
   }
 
@@ -173,6 +194,34 @@ export default function DemoDetail() {
             )}
           </>
         )}
+      </div>
+
+      <div className="card" style={{ marginTop: 20 }}>
+        <div className="row between" style={{ marginBottom: 8 }}>
+          <h2 style={{ margin: 0 }}>Template defaults</h2>
+          <div className="row gap-sm">
+            <button
+              className="btn primary"
+              disabled={savingDefaults || !defaultsDirty}
+              onClick={saveDefaults}
+            >
+              {savingDefaults ? 'Saving…' : defaultsDirty ? 'Save defaults' : 'Saved'}
+            </button>
+          </div>
+        </div>
+        <div className="muted" style={{ marginBottom: 12, fontSize: 13, lineHeight: 1.5 }}>
+          Fill in the values the template has <strong>baked into its built bundle</strong>
+          {' '}— e.g. the literal "Novatec Glass" you see in the rendered site, the template's
+          default contact email, phone, address, hero copy, social URLs, etc. When a tenant
+          is served, the host tool substitutes each of these strings with the tenant's
+          matching value across the served HTML and the bundled JS/CSS. This catches
+          anything the template hardcoded in JSX instead of reading from <span className="mono">site.*</span>.
+          Strings shorter than 3 characters are skipped to avoid spurious matches.
+        </div>
+        <SiteConfigForm
+          value={defaults}
+          onChange={(next) => { setDefaults(next); setDefaultsDirty(true); }}
+        />
       </div>
 
       <div className="card" style={{ marginTop: 20 }}>
