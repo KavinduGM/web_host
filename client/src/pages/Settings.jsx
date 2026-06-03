@@ -1,21 +1,42 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 
-export default function Settings() {
-  const [settings, setSettings] = useState(null);
-  const [form, setForm] = useState({});
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  const [saved, setSaved] = useState(false);
+// Local fallback so the page is editable even if the GET fails — the user
+// can still type a value and try to save; we won't blank-out their input.
+const FALLBACK = { default_offer_price: '$800' };
 
-  useEffect(() => {
-    api.getSettings()
-      .then((s) => { setSettings(s); setForm(s); })
-      .catch((e) => setErr(e.message));
-  }, []);
+export default function Settings() {
+  const [settings, setSettings] = useState(null);   // null = loading
+  const [form, setForm]         = useState(FALLBACK);
+  const [busy, setBusy]         = useState(false);
+  const [loadErr, setLoadErr]   = useState('');
+  const [saveErr, setSaveErr]   = useState('');
+  const [saved, setSaved]       = useState(false);
+
+  async function load() {
+    setLoadErr('');
+    try {
+      const s = await api.getSettings();
+      setSettings(s);
+      // Only seed the form on first load OR if the user hasn't typed anything
+      // (i.e. the form still equals the fallback / previous server state).
+      setForm((prev) => (
+        settings == null || JSON.stringify(prev) === JSON.stringify(settings || FALLBACK)
+          ? s
+          : prev
+      ));
+    } catch (e) {
+      setLoadErr(e.message || 'Could not load settings');
+      // If this was the first load, fall back to defaults so the form still
+      // renders — the user can save to push their value to the server.
+      if (settings == null) setSettings(FALLBACK);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
 
   async function save() {
-    setErr('');
+    setSaveErr('');
     setSaved(false);
     setBusy(true);
     try {
@@ -25,20 +46,31 @@ export default function Settings() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (e) {
-      setErr(e.message);
+      setSaveErr(e.message || 'Could not save settings');
     } finally {
       setBusy(false);
     }
   }
 
-  if (!settings) return <div className="container muted">Loading…</div>;
+  if (settings == null) return <div className="container muted">Loading…</div>;
 
   const dirty = JSON.stringify(form) !== JSON.stringify(settings);
 
   return (
     <div className="container" style={{ maxWidth: 720 }}>
       <h1>Settings</h1>
-      {err && <div className="error">{err}</div>}
+
+      {loadErr && (
+        <div className="error" style={{ marginBottom: 12 }}>
+          Could not load current settings: <span className="mono">{loadErr}</span>.{' '}
+          <button className="btn" onClick={load} style={{ marginLeft: 8, padding: '2px 10px', fontSize: 12 }}>
+            Retry
+          </button>
+          <div style={{ fontSize: 12, marginTop: 6, opacity: 0.8 }}>
+            You can still type a value below and try to save it.
+          </div>
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0 }}>Claim widget — global default price</h2>
@@ -58,6 +90,12 @@ export default function Settings() {
           />
           <div className="hint">e.g. <span className="mono">$800</span>, <span className="mono">$1,200</span>, <span className="mono">LKR 250,000</span></div>
         </div>
+
+        {saveErr && (
+          <div className="error" style={{ marginTop: 10 }}>
+            Save failed: <span className="mono">{saveErr}</span>
+          </div>
+        )}
 
         <div className="row gap-sm" style={{ marginTop: 12 }}>
           <button className="btn primary" disabled={busy || !dirty} onClick={save}>

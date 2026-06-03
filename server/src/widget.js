@@ -108,13 +108,10 @@
     });
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', mount, { once: true });
-  } else {
-    mount();
-  }
-
-  // ---- HTML + CSS ----
+  // ---- HTML + CSS ---- (declared BEFORE mount() runs — when this script is
+  // loaded with `async` and the DOM is already parsed, mount() executes
+  // synchronously and would otherwise hit `TEMPLATE_HTML` in its temporal
+  // dead zone, crashing the widget before it ever renders.)
   const TEMPLATE_HTML = `
     <style>
       :host, * { box-sizing: border-box; }
@@ -491,4 +488,11 @@
       </div>
     </div>
   `;
+
+  // Now that TEMPLATE_HTML is initialized, kick off mount.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mount, { once: true });
+  } else {
+    mount();
+  }
 })();
