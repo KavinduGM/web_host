@@ -95,6 +95,16 @@ router.patch('/:id', (req, res) => {
     build_cmd,
     output_dir,
   });
+
+  // offer_price is a per-template override of the global default; an empty
+  // string clears it (back to global). Only updated if the field is present
+  // in the body so existing patches don't accidentally wipe it.
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'offer_price')) {
+    const v = req.body.offer_price;
+    const norm = typeof v === 'string' && v.trim() ? v.trim().slice(0, 80) : null;
+    queries.setDemoOfferPrice.run(norm, demo.id);
+  }
+
   res.json(serialize(queries.getDemoById.get(demo.id)));
 });
 

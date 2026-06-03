@@ -114,6 +114,15 @@ router.patch('/:id', (req, res) => {
     name,
     config: JSON.stringify(cfg),
   });
+
+  // Per-tenant override of the claim-widget offer price.  Empty string clears
+  // it (back to inheriting from the template, which inherits from global).
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'offer_price')) {
+    const v = req.body.offer_price;
+    const norm = typeof v === 'string' && v.trim() ? v.trim().slice(0, 80) : null;
+    queries.setTenantOfferPrice.run(norm, t.id);
+  }
+
   res.json(serialize(queries.getTenantById(t.id)));
 });
 

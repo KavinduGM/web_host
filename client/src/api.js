@@ -50,6 +50,10 @@ export const api = {
   listTenantUploads: (id) => request(`/tenants/${id}/uploads`),
   deleteTenantUpload: (id, filename) =>
     request(`/tenants/${id}/uploads/${encodeURIComponent(filename)}`, { method: 'DELETE' }),
+  // settings (global)
+  getSettings: () => request('/settings'),
+  updateSettings: (data) => request('/settings', { method: 'PUT', body: JSON.stringify(data) }),
+
   // inquiries (admin views)
   listInquiries: () => request('/inquiries'),
   getInquiry: (id) => request(`/inquiries/${id}`),

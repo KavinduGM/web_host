@@ -32,6 +32,7 @@ export default function DemoDetail() {
           git_branch: d.git_branch,
           build_cmd: d.build_cmd,
           output_dir: d.output_dir,
+          offer_price: d.offer_price || '',
         });
       }
       if (!defaultsDirty) {
@@ -161,6 +162,15 @@ export default function DemoDetail() {
           <Field label="Build command" value={form.build_cmd} edit={editing} mono onChange={(v) => setForm({ ...form, build_cmd: v })} />
           <Field label="Output directory" value={form.output_dir} edit={editing} mono onChange={(v) => setForm({ ...form, output_dir: v })} />
           <Field label="Slug" value={demo.slug} edit={false} mono />
+          <Field
+            label="Offer price (claim widget)"
+            value={form.offer_price}
+            edit={editing}
+            mono
+            placeholder={`(inherit global — currently ${demo.offer_price || 'global default'})`}
+            onChange={(v) => setForm({ ...form, offer_price: v })}
+            hint="Per-template override of the global default. Leave blank to inherit. All tenants of this template inherit this price too unless they override it."
+          />
         </div>
       </div>
 
@@ -266,7 +276,7 @@ export default function DemoDetail() {
   );
 }
 
-function Field({ label, value, edit, onChange, mono }) {
+function Field({ label, value, edit, onChange, mono, placeholder, hint }) {
   return (
     <div className="field">
       <label>{label}</label>
@@ -274,11 +284,13 @@ function Field({ label, value, edit, onChange, mono }) {
         <input
           className={`input ${mono ? 'mono' : ''}`}
           value={value || ''}
+          placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
         />
       ) : (
         <div className={mono ? 'mono' : ''}>{value || <span className="muted">—</span>}</div>
       )}
+      {hint && <div className="hint">{hint}</div>}
     </div>
   );
 }

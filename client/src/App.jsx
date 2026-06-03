@@ -8,6 +8,7 @@ import DemoDetail from './pages/DemoDetail.jsx';
 import Tenants from './pages/Tenants.jsx';
 import TenantEditor from './pages/TenantEditor.jsx';
 import Inquiries from './pages/Inquiries.jsx';
+import Settings from './pages/Settings.jsx';
 
 export default function App() {
   const [authed, setAuthed] = useState(null);
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/tenants/new" element={<TenantEditor />} />
         <Route path="/tenants/:id" element={<TenantEditor />} />
         <Route path="/inquiries" element={<Inquiries />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
@@ -94,6 +96,7 @@ function Topbar({ onLogout }) {
           </NavLink>
           <NavLink to="/new">+ Template</NavLink>
           <NavLink to="/tenants/new">+ Tenant</NavLink>
+          <NavLink to="/settings">Settings</NavLink>
         </nav>
       </div>
       <button className="btn" onClick={logout}>Sign out</button>

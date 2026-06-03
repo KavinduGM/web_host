@@ -8,6 +8,7 @@ const BLANK = {
   slug: '',
   template_id: null,
   config: BLANK_SITE_CONFIG,
+  offer_price: '',
 };
 
 function autoSlug(s) {
@@ -44,6 +45,7 @@ export default function TenantEditor() {
           slug: t.slug,
           template_id: t.template_id,
           config: deepFill(BLANK.config, t.config || {}),
+          offer_price: t.offer_price || '',
         });
       }).catch((e) => setErr(e.message));
       refreshUploads();
@@ -73,11 +75,24 @@ export default function TenantEditor() {
           template_id: form.template_id,
           config: form.config,
         });
+        // offer_price needs a follow-up PATCH if set (POST doesn't take it).
+        if (form.offer_price?.trim()) {
+          await api.updateTenant(created.id, { offer_price: form.offer_price });
+        }
         nav(`/tenants/${created.id}`);
       } else {
-        await api.updateTenant(id, { name: form.name, config: form.config });
+        await api.updateTenant(id, {
+          name: form.name,
+          config: form.config,
+          offer_price: form.offer_price,
+        });
         const t = await api.getTenant(id);
-        setForm((f) => ({ ...f, name: t.name, config: deepFill(BLANK.config, t.config || {}) }));
+        setForm((f) => ({
+          ...f,
+          name: t.name,
+          config: deepFill(BLANK.config, t.config || {}),
+          offer_price: t.offer_price || '',
+        }));
       }
     } catch (e) {
       setErr(e.message);
@@ -169,6 +184,24 @@ export default function TenantEditor() {
             {currentTemplate && currentTemplate.status !== 'ready'
               ? '⚠ Template is not built yet. Tenant URL will 404 until the template builds.'
               : 'The template provides the HTML/CSS/JS. Tenant overrides only branding & copy.'}
+          </div>
+        </div>
+        <div className="field">
+          <label>Offer price (claim widget)</label>
+          <input
+            className="input mono"
+            value={form.offer_price || ''}
+            onChange={(e) => setForm((f) => ({ ...f, offer_price: e.target.value }))}
+            placeholder={
+              currentTemplate?.offer_price
+                ? `(blank = inherit template — currently ${currentTemplate.offer_price})`
+                : '(blank = inherit global default)'
+            }
+            style={{ maxWidth: 260 }}
+          />
+          <div className="hint">
+            Overrides the template's price for this tenant only. e.g. <span className="mono">$1,200</span>.
+            Leave blank to use the template's price (which itself falls back to the global default).
           </div>
         </div>
       </section>

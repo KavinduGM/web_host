@@ -14,6 +14,17 @@
   const CTX = window.__CLAIM_WIDGET_CTX__ || {};
   if (!CTX.source_slug || !CTX.source_kind) return; // safety: no context, no widget
 
+  const OFFER_PRICE = (CTX.offer_price && String(CTX.offer_price).trim()) || '$800';
+
+  // Tiny HTML-escape helper for safely interpolating the price into innerHTML.
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
   function mount() {
     if (!document.body) return setTimeout(mount, 50);
 
@@ -231,23 +242,17 @@
         margin-top: 8px;
       }
       .hdr .price .amount {
-        font-size: 28px;
+        font-size: 32px;
         font-weight: 800;
         letter-spacing: -0.02em;
+        line-height: 1;
       }
-      .hdr .price .strike {
-        font-size: 13px;
-        text-decoration: line-through;
-        opacity: 0.7;
-      }
-      .hdr .price .save {
+      .hdr .price .sub {
         font-size: 11px;
-        font-weight: 700;
-        padding: 2px 8px;
-        border-radius: 999px;
-        background: rgba(251, 191, 36, 0.95);
-        color: #78350f;
-        margin-left: auto;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        opacity: 0.85;
       }
       #close {
         position: absolute;
@@ -428,7 +433,7 @@
     <button id="fab" type="button" aria-label="Open claim offer">
       <span class="dot"></span>
       <span class="icon">🎁</span>
-      <span>Claim This Site • $800</span>
+      <span>Claim This Site • ${esc(OFFER_PRICE)}</span>
     </button>
 
     <div id="card" role="dialog" aria-labelledby="card-title" aria-modal="false">
@@ -437,9 +442,8 @@
         <span class="badge"><span class="pulse-dot"></span>Limited Time Offer</span>
         <h2 id="card-title">Claim This Website</h2>
         <div class="price">
-          <span class="amount">$800</span>
-          <span class="strike">$2,500</span>
-          <span class="save">Save 68%</span>
+          <span class="amount">${esc(OFFER_PRICE)}</span>
+          <span class="sub">one-time · all-in</span>
         </div>
       </div>
 
@@ -482,7 +486,7 @@
         <div id="success">
           <div class="check-big">✓</div>
           <h3>Got it, <span id="ackname">there</span>!</h3>
-          <p>We'll reach out shortly to lock in your $800 offer. Check your inbox.</p>
+          <p>We'll reach out shortly to lock in your ${esc(OFFER_PRICE)} offer. Check your inbox.</p>
         </div>
       </div>
     </div>

@@ -79,6 +79,15 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_inquiries_created ON inquiries(created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_inquiries_status  ON inquiries(status);
+
+  -- Global key/value settings (default claim-offer price, future site-wide knobs)
+  CREATE TABLE IF NOT EXISTS settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  INSERT OR IGNORE INTO settings (key, value) VALUES ('default_offer_price', '$800');
 `);
 
 // Migration: add `defaults` column to existing demos tables that pre-date it.
@@ -87,6 +96,15 @@ db.exec(`
 const demoCols = db.prepare(`PRAGMA table_info(demos)`).all().map((c) => c.name);
 if (!demoCols.includes('defaults')) {
   db.exec(`ALTER TABLE demos ADD COLUMN defaults TEXT NOT NULL DEFAULT '{}'`);
+}
+// Per-template offer-price override (null = inherit global default).
+if (!demoCols.includes('offer_price')) {
+  db.exec(`ALTER TABLE demos ADD COLUMN offer_price TEXT`);
+}
+// Per-tenant offer-price override (null = inherit from template, which inherits from global).
+const tenantCols = db.prepare(`PRAGMA table_info(tenants)`).all().map((c) => c.name);
+if (!tenantCols.includes('offer_price')) {
+  db.exec(`ALTER TABLE tenants ADD COLUMN offer_price TEXT`);
 }
 
 // --- helpers for tenant config parsing ---
@@ -139,6 +157,9 @@ export const queries = {
   setDemoDefaults: db.prepare(`
     UPDATE demos SET defaults = ?, updated_at = datetime('now') WHERE id = ?
   `),
+  setDemoOfferPrice: db.prepare(`
+    UPDATE demos SET offer_price = ?, updated_at = datetime('now') WHERE id = ?
+  `),
   deleteDemo: db.prepare('DELETE FROM demos WHERE id = ?'),
 
   // ---- build logs ----
@@ -181,6 +202,9 @@ export const queries = {
   setTenantEnabled: db.prepare(`
     UPDATE tenants SET enabled = ?, updated_at = datetime('now') WHERE id = ?
   `),
+  setTenantOfferPrice: db.prepare(`
+    UPDATE tenants SET offer_price = ?, updated_at = datetime('now') WHERE id = ?
+  `),
   deleteTenant: db.prepare('DELETE FROM tenants WHERE id = ?'),
 
   // ---- inquiries ----
@@ -198,5 +222,13 @@ export const queries = {
   deleteInquiry: db.prepare(`DELETE FROM inquiries WHERE id = ?`),
   countInquiriesByStatus: db.prepare(`
     SELECT status, COUNT(*) as n FROM inquiries GROUP BY status
+  `),
+
+  // ---- settings ----
+  getSetting: db.prepare(`SELECT value FROM settings WHERE key = ?`),
+  listSettings: db.prepare(`SELECT key, value FROM settings`),
+  upsertSetting: db.prepare(`
+    INSERT INTO settings (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
   `),
 };

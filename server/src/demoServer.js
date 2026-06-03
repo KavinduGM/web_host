@@ -168,11 +168,23 @@ export function demoServerMiddleware() {
           templateSlug, activeTenant.slug, templateDefaults,
         );
       }
+      // Resolve the offer price displayed by the claim widget:
+      //   tenant override → template override → global default → "$800"
+      const globalDefault =
+        queries.getSetting.get('default_offer_price')?.value || '$800';
+      const offerPrice = activeTenant
+        ? (activeTenant.offer_price
+            || (activeTenant.template_id
+                ? queries.getDemoById.get(activeTenant.template_id)?.offer_price
+                : null)
+            || globalDefault)
+        : (activeDemo?.offer_price || globalDefault);
+
       // Always inject the "Claim This Website" widget on top of whatever
       // transforms were done above (tenant or plain template).
       out = injectClaimWidget(out, activeTenant
-        ? { kind: 'tenant', id: activeTenant.id, slug: activeTenant.slug, name: activeTenant.name }
-        : { kind: 'template', id: activeDemo?.id, slug: slug, name: activeDemo?.name || slug }
+        ? { kind: 'tenant', id: activeTenant.id, slug: activeTenant.slug, name: activeTenant.name, offer_price: offerPrice }
+        : { kind: 'template', id: activeDemo?.id, slug: slug, name: activeDemo?.name || slug, offer_price: offerPrice }
       );
       return res.send(out);
     } catch (err) {
@@ -393,6 +405,7 @@ function injectClaimWidget(html, source) {
     source_id:   source.id ?? null,
     source_slug: source.slug,
     source_name: source.name,
+    offer_price: source.offer_price || '$800',
   });
   const snippet =
     `<script>window.__CLAIM_WIDGET_CTX__=${ctxJson};</script>` +
