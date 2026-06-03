@@ -29,27 +29,29 @@ export default function App() {
 
   return (
     <div className="app">
-      <Topbar onLogout={() => setAuthed(false)} />
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/new" element={<NewDemo />} />
-        <Route path="/demos/:id" element={<DemoDetail />} />
-        <Route path="/tenants" element={<Tenants />} />
-        <Route path="/tenants/new" element={<TenantEditor />} />
-        <Route path="/tenants/:id" element={<TenantEditor />} />
-        <Route path="/inquiries" element={<Inquiries />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Sidebar onLogout={() => setAuthed(false)} />
+      <main className="main">
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/new" element={<NewDemo />} />
+          <Route path="/demos/:id" element={<DemoDetail />} />
+          <Route path="/tenants" element={<Tenants />} />
+          <Route path="/tenants/new" element={<TenantEditor />} />
+          <Route path="/tenants/:id" element={<TenantEditor />} />
+          <Route path="/inquiries" element={<Inquiries />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
     </div>
   );
 }
 
-function Topbar({ onLogout }) {
+function Sidebar({ onLogout }) {
   const nav = useNavigate();
   const [newCount, setNewCount] = useState(0);
 
-  // Poll the inquiry count so the topbar shows a live "new" badge.
+  // Live "new inquiries" badge — polls every 15s.
   useEffect(() => {
     let cancelled = false;
     async function poll() {
@@ -68,38 +70,54 @@ function Topbar({ onLogout }) {
     onLogout();
     nav('/login');
   }
+
   return (
-    <div className="topbar">
-      <div className="row gap-sm">
-        <div className="brand">Demo Host</div>
-        <nav style={{ marginLeft: 24 }}>
-          <NavLink to="/" end>Templates</NavLink>
-          <NavLink to="/tenants">Tenants</NavLink>
-          <NavLink to="/inquiries">
-            Inquiries
-            {newCount > 0 && (
-              <span
-                className="badge"
-                style={{
-                  marginLeft: 6,
-                  background: '#a78bfa',
-                  color: '#0c0f14',
-                  padding: '1px 7px',
-                  fontSize: 10,
-                  borderRadius: 999,
-                  fontWeight: 700,
-                }}
-              >
-                {newCount}
-              </span>
-            )}
-          </NavLink>
-          <NavLink to="/new">+ Template</NavLink>
-          <NavLink to="/tenants/new">+ Tenant</NavLink>
-          <NavLink to="/settings">Settings</NavLink>
-        </nav>
+    <aside className="sidebar">
+      <div className="brand">
+        <span className="logo">D</span>
+        <span>Demo Host</span>
       </div>
-      <button className="btn" onClick={logout}>Sign out</button>
-    </div>
+
+      <div className="section">Workspace</div>
+      <nav>
+        <NavLink to="/" end>
+          <span className="nav-icon">🗂</span>
+          <span>Templates</span>
+        </NavLink>
+        <NavLink to="/tenants">
+          <span className="nav-icon">👥</span>
+          <span>Tenants</span>
+        </NavLink>
+        <NavLink to="/inquiries">
+          <span className="nav-icon">📥</span>
+          <span>Inquiries</span>
+          {newCount > 0 && <span className="nav-badge">{newCount}</span>}
+        </NavLink>
+      </nav>
+
+      <div className="section">Create</div>
+      <nav>
+        <NavLink to="/new">
+          <span className="nav-icon">＋</span>
+          <span>New template</span>
+        </NavLink>
+        <NavLink to="/tenants/new">
+          <span className="nav-icon">＋</span>
+          <span>New tenant</span>
+        </NavLink>
+      </nav>
+
+      <div className="section">System</div>
+      <nav>
+        <NavLink to="/settings">
+          <span className="nav-icon">⚙</span>
+          <span>Settings</span>
+        </NavLink>
+      </nav>
+
+      <div className="sidebar-footer">
+        <button className="btn" onClick={logout}>Sign out</button>
+      </div>
+    </aside>
   );
 }

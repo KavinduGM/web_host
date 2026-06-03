@@ -42,14 +42,23 @@ const upload = multer({
   },
 });
 
-function serialize(t) {
+function serialize(t, viewsById) {
   if (!t) return null;
   const template = queries.getDemoById.get(t.template_id);
+  const v = viewsById?.[t.id];
   return {
     ...t,
     url: `${config.publicBaseUrl}/${t.slug}/`,
     template: template ? { id: template.id, slug: template.slug, name: template.name, status: template.status } : null,
+    views: v ? { total: v.total, last_at: v.last_at } : { total: 0, last_at: null },
   };
+}
+
+function bulkTenantViewStats() {
+  const rows = queries.viewStatsAllByKind.all('tenant');
+  const out = {};
+  for (const r of rows) out[r.source_id] = r;
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -58,19 +67,31 @@ function serialize(t) {
 
 // List ALL tenants (across templates)
 router.get('/', (req, res) => {
-  res.json(queries.listAllTenants().map(serialize));
+  const stats = bulkTenantViewStats();
+  res.json(queries.listAllTenants().map((t) => serialize(t, stats)));
 });
 
 // List tenants for a specific template
 router.get('/by-template/:templateId', (req, res) => {
+  const stats = bulkTenantViewStats();
   const list = queries.listTenantsByTemplate(Number(req.params.templateId));
-  res.json(list.map(serialize));
+  res.json(list.map((t) => serialize(t, stats)));
 });
 
 router.get('/:id', (req, res) => {
   const t = queries.getTenantById(req.params.id);
   if (!t) return res.status(404).json({ error: 'not found' });
-  res.json(serialize(t));
+  const viewStats = queries.viewStatsByKindId.get('tenant', t.id) || {};
+  res.json({
+    ...serialize(t),
+    views: {
+      total:   viewStats.total   || 0,
+      last7d:  viewStats.last7d  || 0,
+      last24h: viewStats.last24h || 0,
+      last_at: viewStats.last_at || null,
+    },
+    recent_views: queries.recentViews.all('tenant', t.id, 25),
+  });
 });
 
 router.post('/', (req, res) => {

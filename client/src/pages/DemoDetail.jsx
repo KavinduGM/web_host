@@ -109,6 +109,8 @@ export default function DemoDetail() {
 
   if (!demo) return <div className="container muted">Loading…</div>;
 
+  const views = demo.views || {};
+
   return (
     <div className="container">
       <div className="row between" style={{ marginBottom: 16 }}>
@@ -116,6 +118,32 @@ export default function DemoDetail() {
         <div className="row gap-sm">
           <span className={`badge ${demo.status}`}>{demo.status}</span>
           {!demo.enabled && <span className="badge disabled">disabled</span>}
+        </div>
+      </div>
+
+      {/* Views overview */}
+      <div className="stat-grid">
+        <div className="stat">
+          <div className="label">Total views</div>
+          <div className="value">{(views.total || 0).toLocaleString()}</div>
+          <div className="sub">since launch</div>
+        </div>
+        <div className="stat">
+          <div className="label">Last 7 days</div>
+          <div className="value">{(views.last7d || 0).toLocaleString()}</div>
+          <div className="sub">{(views.last24h || 0)} in last 24h</div>
+        </div>
+        <div className="stat">
+          <div className="label">Last visit</div>
+          <div className="value" style={{ fontSize: 18 }}>
+            {views.last_at ? relativeTime(views.last_at) : '—'}
+          </div>
+          <div className="sub">{views.last_at || 'no visits yet'}</div>
+        </div>
+        <div className="stat">
+          <div className="label">Inquiries</div>
+          <div className="value">—</div>
+          <div className="sub"><Link to="/inquiries">view all →</Link></div>
         </div>
       </div>
 
@@ -206,6 +234,36 @@ export default function DemoDetail() {
         )}
       </div>
 
+      {demo.recent_views && demo.recent_views.length > 0 && (
+        <div className="card" style={{ marginTop: 20, padding: 0, overflow: 'hidden' }}>
+          <h2 style={{ margin: 0, padding: '16px 20px 12px' }}>Recent visits</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Referer</th>
+                <th>IP</th>
+                <th>User agent</th>
+              </tr>
+            </thead>
+            <tbody>
+              {demo.recent_views.slice(0, 15).map((v) => (
+                <tr key={v.id}>
+                  <td className="muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{relativeTime(v.created_at)}</td>
+                  <td className="mono" style={{ fontSize: 12, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {v.referer || <span className="muted">direct</span>}
+                  </td>
+                  <td className="mono muted" style={{ fontSize: 12 }}>{v.ip || '—'}</td>
+                  <td className="mono muted" style={{ fontSize: 11, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {v.user_agent || '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <div className="card" style={{ marginTop: 20 }}>
         <div className="row between" style={{ marginBottom: 8 }}>
           <h2 style={{ margin: 0 }}>Template defaults</h2>
@@ -274,6 +332,17 @@ export default function DemoDetail() {
       </div>
     </div>
   );
+}
+
+function relativeTime(iso) {
+  if (!iso) return '';
+  const then = new Date(iso.replace(' ', 'T') + 'Z').getTime();
+  const sec = Math.max(1, Math.floor((Date.now() - then) / 1000));
+  if (sec < 60)     return `${sec}s ago`;
+  if (sec < 3600)   return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400)  return `${Math.floor(sec / 3600)}h ago`;
+  if (sec < 604800) return `${Math.floor(sec / 86400)}d ago`;
+  return new Date(then).toLocaleDateString();
 }
 
 function Field({ label, value, edit, onChange, mono, placeholder, hint }) {

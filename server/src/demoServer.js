@@ -155,6 +155,13 @@ export function demoServerMiddleware() {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
 
+    // Track this view (HTML serves only — assets above don't count).  Best-
+    // effort: failures here never block the page response.
+    try { recordView(req, activeTenant ? 'tenant' : 'template',
+                     activeTenant ? activeTenant.id : (activeDemo?.id ?? null),
+                     slug); }
+    catch (e) { console.error('[demoServer] view-track failed:', e); }
+
     try {
       const html = await fsp.readFile(indexPath, 'utf8');
       let out = html;
@@ -196,6 +203,23 @@ export function demoServerMiddleware() {
 
 async function stat(p) {
   try { return await fsp.stat(p); } catch { return null; }
+}
+
+// Coarse bot detection — skip recording views for crawlers, uptime monitors,
+// curl/wget probes, etc. so the per-demo "Views" count actually reflects
+// human traffic that admins care about.
+const BOT_RE = /bot|crawler|spider|crawling|preview|prerender|uptime|monitor|pingdom|gtmetrix|lighthouse|headless|facebookexternalhit|whatsapp|telegram|discord|slack|curl|wget|node-fetch|axios|python-requests|libwww|http-client/i;
+
+function recordView(req, kind, id, slug) {
+  const ua = req.get('user-agent') || '';
+  if (!ua || BOT_RE.test(ua)) return; // skip bots / scripts
+  // Also skip HEAD requests and prefetches (browser link-preview, RSS, etc.)
+  if (req.method !== 'GET') return;
+  if (req.get('purpose') === 'prefetch' || req.get('sec-purpose')?.includes('prefetch')) return;
+
+  const referer = (req.get('referer') || '').slice(0, 500) || null;
+  const ip      = (req.ip || '').slice(0, 64) || null;
+  queries.recordView.run(kind, id, slug, referer, ua.slice(0, 500), ip);
 }
 
 function escapeAttr(s) {

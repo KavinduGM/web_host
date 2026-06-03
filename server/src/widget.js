@@ -127,25 +127,26 @@
       #fab {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        padding: 14px 20px;
+        gap: 10px;
+        padding: 18px 26px;
         border: none;
         border-radius: 999px;
-        font-size: 14px;
-        font-weight: 600;
+        font-size: 16px;
+        font-weight: 700;
         color: #fff;
         background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
         background-size: 200% 200%;
         cursor: pointer;
         box-shadow:
-          0 10px 30px -8px rgba(139, 92, 246, 0.55),
-          0 4px 12px -2px rgba(0, 0, 0, 0.15);
+          0 14px 36px -8px rgba(139, 92, 246, 0.6),
+          0 6px 16px -2px rgba(0, 0, 0, 0.18);
         transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
         animation: bgshift 8s ease-in-out infinite, pulse 2.5s ease-in-out infinite;
         font-family: inherit;
         letter-spacing: 0.01em;
         white-space: nowrap;
       }
+      #fab .icon { font-size: 20px; }
       #fab:hover {
         transform: translateY(-2px);
         box-shadow:
@@ -155,9 +156,8 @@
       }
       #fab:active { transform: translateY(0); }
       #fab.hidden { opacity: 0; pointer-events: none; transform: scale(0.9); }
-      #fab .icon { font-size: 16px; line-height: 1; }
       #fab .dot {
-        width: 8px; height: 8px; border-radius: 50%;
+        width: 10px; height: 10px; border-radius: 50%;
         background: #fbbf24;
         box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7);
         animation: dot-pulse 1.5s ease-out infinite;
@@ -452,8 +452,11 @@
           </p>
           <ul class="features">
             <li><span class="check">✓</span> Full custom branding</li>
-            <li><span class="check">✓</span> Hosted &amp; SSL included</li>
-            <li><span class="check">✓</span> Unlimited content edits for 30 days</li>
+            <li><span class="check">✓</span> Domain &amp; free hosting with SSL included</li>
+            <li><span class="check">✓</span> 2 revisions round included</li>
+            <li><span class="check">✓</span> Lifetime bug-free guarantee</li>
+            <li><span class="check">✓</span> 24/7 customer support</li>
+            <li><span class="check">✓</span> Free on-site SEO &amp; Google Search Console setup</li>
           </ul>
 
           <div class="field">

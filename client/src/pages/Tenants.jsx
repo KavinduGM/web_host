@@ -57,6 +57,7 @@ export default function Tenants() {
                 <th>Slug</th>
                 <th>Template</th>
                 <th>Demo URL</th>
+                <th style={{ textAlign: 'right' }}>Views</th>
                 <th>Status</th>
                 <th></th>
               </tr>
@@ -77,6 +78,9 @@ export default function Tenants() {
                     ) : (
                       <span className="muted mono">{t.url}</span>
                     )}
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                    {t.views?.total ? t.views.total.toLocaleString() : <span className="muted">—</span>}
                   </td>
                   <td>
                     {t.enabled

@@ -10,13 +10,15 @@ import { normalizeConfig } from '../tenantConfig.js';
 const router = Router();
 router.use(requireAuth);
 
-function serialize(demo) {
+function serialize(demo, viewsByDemoId) {
   if (!demo) return null;
+  const v = viewsByDemoId?.[demo.id];
   return {
     ...demo,
     enabled: !!demo.enabled,
     url: `${config.publicBaseUrl}/${demo.slug}/`,
     defaults: safeJSON(demo.defaults),
+    views: v ? { total: v.total, last_at: v.last_at } : { total: 0, last_at: null },
   };
 }
 function safeJSON(s) {
@@ -24,15 +26,32 @@ function safeJSON(s) {
   try { return s ? JSON.parse(s) : {}; } catch { return {}; }
 }
 
+// Build a {id → {total, last_at}} map for every template, in one query.
+function bulkViewStats() {
+  const rows = queries.viewStatsAllByKind.all('template');
+  const out = {};
+  for (const r of rows) out[r.source_id] = r;
+  return out;
+}
+
 router.get('/', (req, res) => {
-  res.json(queries.listDemos.all().map(serialize));
+  const stats = bulkViewStats();
+  res.json(queries.listDemos.all().map((d) => serialize(d, stats)));
 });
 
 router.get('/:id', (req, res) => {
   const demo = queries.getDemoById.get(req.params.id);
   if (!demo) return res.status(404).json({ error: 'not found' });
+  const viewStats = queries.viewStatsByKindId.get('template', demo.id) || {};
   res.json({
     ...serialize(demo),
+    views: {
+      total:   viewStats.total   || 0,
+      last7d:  viewStats.last7d  || 0,
+      last24h: viewStats.last24h || 0,
+      last_at: viewStats.last_at || null,
+    },
+    recent_views: queries.recentViews.all('template', demo.id, 25),
     builds: queries.listBuildLogs.all(demo.id),
   });
 });

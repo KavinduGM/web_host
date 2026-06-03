@@ -88,7 +88,35 @@ db.exec(`
   );
 
   INSERT OR IGNORE INTO settings (key, value) VALUES ('default_offer_price', '$800');
+
+  -- One row per page view of a demo (template or tenant).  Lets the admin see
+  -- which links prospects actually click on.  Indexed for fast count + recent-
+  -- view lookups; trimmed periodically (see prune at the bottom of this file).
+  CREATE TABLE IF NOT EXISTS page_views (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_kind TEXT NOT NULL,            -- 'template' | 'tenant'
+    source_id   INTEGER,                  -- demos.id or tenants.id
+    source_slug TEXT NOT NULL,
+    referer     TEXT,
+    user_agent  TEXT,
+    ip          TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_page_views_kind_id ON page_views(source_kind, source_id);
+  CREATE INDEX IF NOT EXISTS idx_page_views_slug    ON page_views(source_slug);
+  CREATE INDEX IF NOT EXISTS idx_page_views_created ON page_views(created_at DESC);
 `);
+
+// Cap the page_views table at a sensible size so a high-traffic deployment
+// doesn't fill the SQLite file with old rows.  Aggregate counts come from
+// per-source caches (see queries.viewStatsBySlug) — exact recent views are
+// still queryable up to LIMIT.
+const VIEW_RETENTION = Number(process.env.PAGE_VIEW_RETENTION || 50000);
+db.prepare(`
+  DELETE FROM page_views
+   WHERE id IN (SELECT id FROM page_views ORDER BY id DESC LIMIT -1 OFFSET ?)
+`).run(VIEW_RETENTION);
 
 // Migration: add `defaults` column to existing demos tables that pre-date it.
 // CREATE TABLE IF NOT EXISTS leaves the schema alone if the table exists, so
@@ -230,5 +258,41 @@ export const queries = {
   upsertSetting: db.prepare(`
     INSERT INTO settings (key, value) VALUES (?, ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+  `),
+
+  // ---- page views ----
+  recordView: db.prepare(`
+    INSERT INTO page_views (source_kind, source_id, source_slug, referer, user_agent, ip)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `),
+  // Aggregate counts for a single source.  Used by the demo / tenant detail
+  // pages and embedded in the list responses so the dashboard can show a
+  // "Views" column without an extra round trip per row.
+  viewStatsByKindId: db.prepare(`
+    SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN created_at >= datetime('now', '-7 days')  THEN 1 ELSE 0 END) AS last7d,
+      SUM(CASE WHEN created_at >= datetime('now', '-1 day')   THEN 1 ELSE 0 END) AS last24h,
+      MAX(created_at) AS last_at
+    FROM page_views
+    WHERE source_kind = ? AND source_id = ?
+  `),
+  // Bulk stats for everything of a given kind — keyed by source_id so the list
+  // endpoints can join in O(1) per row.
+  viewStatsAllByKind: db.prepare(`
+    SELECT
+      source_id,
+      COUNT(*)         AS total,
+      MAX(created_at)  AS last_at
+    FROM page_views
+    WHERE source_kind = ? AND source_id IS NOT NULL
+    GROUP BY source_id
+  `),
+  recentViews: db.prepare(`
+    SELECT id, source_kind, source_id, source_slug, referer, user_agent, ip, created_at
+    FROM page_views
+    WHERE source_kind = ? AND source_id = ?
+    ORDER BY id DESC
+    LIMIT ?
   `),
 };
