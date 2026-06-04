@@ -9,13 +9,15 @@
 // passes no uploadFile.
 
 export const BLANK_SITE_CONFIG = {
-  company:  { name: '', tagline: '', logo: '', favicon: '' },
-  colors:   { primary: '#003d7a', accent: '#f7b500', primaryText: '' },
-  contact:  { email: '', phone: '', address: '', socials: { facebook: '', instagram: '', linkedin: '', whatsapp: '' } },
-  hero:     { headline: '', subheadline: '', ctaLabel: '', ctaHref: '' },
-  products: [],
-  footer:   { copyright: '', tagline: '' },
-  meta:     { title: '', description: '' },
+  company:     { name: '', tagline: '', logo: '', favicon: '' },
+  colors:      { primary: '#003d7a', accent: '#f7b500', primaryText: '' },
+  contact:     { email: '', phone: '', address: '', socials: { facebook: '', instagram: '', linkedin: '', whatsapp: '' } },
+  hero:        { headline: '', subheadline: '', ctaLabel: '', ctaHref: '' },
+  products:    [],
+  testimonials:[],
+  stats:       [],
+  footer:      { copyright: '', tagline: '' },
+  meta:        { title: '', description: '' },
 };
 
 export default function SiteConfigForm({ value, onChange, uploadFile, uploads, onDeleteUpload }) {
@@ -37,6 +39,16 @@ export default function SiteConfigForm({ value, onChange, uploadFile, uploads, o
   function setProducts(updater) {
     const next = structuredClone(cfg);
     next.products = updater(next.products || []);
+    onChange(next);
+  }
+  function setTestimonials(updater) {
+    const next = structuredClone(cfg);
+    next.testimonials = updater(next.testimonials || []);
+    onChange(next);
+  }
+  function setStats(updater) {
+    const next = structuredClone(cfg);
+    next.stats = updater(next.stats || []);
     onChange(next);
   }
 
@@ -210,6 +222,119 @@ export default function SiteConfigForm({ value, onChange, uploadFile, uploads, o
         ))}
       </section>
 
+      {/* TESTIMONIALS */}
+      <section className="card" style={{ marginBottom: 16 }}>
+        <div className="row between">
+          <h2 style={{ margin: 0 }}>Testimonials</h2>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setTestimonials((arr) => [...arr, { quote: '', author: '', role: '', company: '', rating: 5 }])}
+          >
+            + Add testimonial
+          </button>
+        </div>
+        {(cfg.testimonials || []).length === 0 && (
+          <div className="muted" style={{ marginTop: 12 }}>
+            No testimonials yet. The template's defaults will be used unless you add at least one here.
+          </div>
+        )}
+        {(cfg.testimonials || []).map((t, i) => (
+          <div key={i} className="card" style={{ background: 'var(--surface-2, #f9fafc)', marginTop: 12 }}>
+            <div className="row between">
+              <strong>Testimonial #{i + 1}</strong>
+              <button
+                type="button"
+                className="btn danger"
+                onClick={() => setTestimonials((arr) => arr.filter((_, idx) => idx !== i))}
+              >
+                Remove
+              </button>
+            </div>
+            <Text
+              label="Quote"
+              value={t.quote}
+              multiline
+              onChange={(v) => setTestimonials((arr) => arr.map((x, idx) => idx === i ? { ...x, quote: v } : x))}
+            />
+            <div className="row" style={{ gap: 16 }}>
+              <Text
+                label="Author name"
+                value={t.author}
+                onChange={(v) => setTestimonials((arr) => arr.map((x, idx) => idx === i ? { ...x, author: v } : x))}
+              />
+              <Rating
+                label="Rating"
+                value={t.rating ?? 5}
+                onChange={(v) => setTestimonials((arr) => arr.map((x, idx) => idx === i ? { ...x, rating: v } : x))}
+              />
+            </div>
+            <div className="row" style={{ gap: 16 }}>
+              <Text
+                label="Role / title"
+                value={t.role}
+                onChange={(v) => setTestimonials((arr) => arr.map((x, idx) => idx === i ? { ...x, role: v } : x))}
+              />
+              <Text
+                label="Company"
+                value={t.company}
+                onChange={(v) => setTestimonials((arr) => arr.map((x, idx) => idx === i ? { ...x, company: v } : x))}
+              />
+            </div>
+          </div>
+        ))}
+      </section>
+
+      {/* STATS */}
+      <section className="card" style={{ marginBottom: 16 }}>
+        <div className="row between">
+          <h2 style={{ margin: 0 }}>Stats / social-proof numbers</h2>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setStats((arr) => [...arr, { value: '', label: '' }])}
+          >
+            + Add stat
+          </button>
+        </div>
+        <div className="muted" style={{ marginTop: 6, fontSize: 12.5 }}>
+          Big numbers shown in the testimonial / "trusted by" section. e.g.{' '}
+          <span className="mono">500+</span> Projects delivered ·{' '}
+          <span className="mono">42</span> Countries ·{' '}
+          <span className="mono">98%</span> On-time delivery.
+        </div>
+        {(cfg.stats || []).length === 0 && (
+          <div className="muted" style={{ marginTop: 12 }}>No stats configured.</div>
+        )}
+        {(cfg.stats || []).map((s, i) => (
+          <div key={i} className="row" style={{ gap: 12, marginTop: 12, alignItems: 'flex-end' }}>
+            <div style={{ flex: '0 0 140px' }}>
+              <Text
+                label="Value"
+                value={s.value}
+                mono
+                onChange={(v) => setStats((arr) => arr.map((x, idx) => idx === i ? { ...x, value: v } : x))}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <Text
+                label="Label"
+                value={s.label}
+                onChange={(v) => setStats((arr) => arr.map((x, idx) => idx === i ? { ...x, label: v } : x))}
+              />
+            </div>
+            <button
+              type="button"
+              className="btn danger"
+              onClick={() => setStats((arr) => arr.filter((_, idx) => idx !== i))}
+              style={{ marginBottom: 14 }}
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+      </section>
+
       {/* FOOTER + META */}
       <section className="card" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0 }}>Footer & meta</h2>
@@ -289,6 +414,36 @@ function Color({ label, value, onChange }) {
 
 function isHex(v) {
   return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
+}
+
+function Rating({ label, value, onChange }) {
+  const n = Math.max(1, Math.min(5, Number(value) || 5));
+  return (
+    <div className="field" style={{ flex: '0 0 160px' }}>
+      <label>{label}</label>
+      <div className="row gap-sm" style={{ alignItems: 'center' }}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onChange(i)}
+            title={`${i} star${i === 1 ? '' : 's'}`}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              fontSize: 22,
+              color: i <= n ? '#f59e0b' : '#d4d4d8',
+              lineHeight: 1,
+            }}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // Recursively keep only fields that exist in `template`, but pull values from `source`.

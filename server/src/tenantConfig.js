@@ -18,6 +18,8 @@ const EMPTY_CONFIG = Object.freeze({
   contact: {},
   hero: {},
   products: [],
+  testimonials: [],
+  stats: [],
   footer: {},
   meta: {},
 });
@@ -72,6 +74,21 @@ export function normalizeConfig(input) {
       price:       asString(p?.price),
     }));
   }
+  if (Array.isArray(input.testimonials)) {
+    cfg.testimonials = input.testimonials.slice(0, 50).map((t) => ({
+      quote:   asString(t?.quote),
+      author:  asString(t?.author),
+      role:    asString(t?.role),
+      company: asString(t?.company),
+      rating:  asRating(t?.rating),
+    }));
+  }
+  if (Array.isArray(input.stats)) {
+    cfg.stats = input.stats.slice(0, 12).map((s) => ({
+      value: asString(s?.value),
+      label: asString(s?.label),
+    }));
+  }
   if (input.footer && typeof input.footer === 'object') {
     cfg.footer = {
       copyright: asString(input.footer.copyright),
@@ -98,6 +115,13 @@ function asColor(v) {
   if (!s) return undefined;
   // Loose validation: hex, rgb(), rgba(), hsl(), named color short form.
   return /^(#[0-9a-fA-F]{3,8}|rgb|hsl|[a-z]+)/i.test(s) ? s : undefined;
+}
+function asRating(v) {
+  // Accept numbers or numeric strings; clamp to 1–5; default to 5 if unset.
+  if (v === undefined || v === null || v === '') return 5;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 5;
+  return Math.max(1, Math.min(5, Math.round(n)));
 }
 function mapStrings(obj, keys) {
   const out = {};
