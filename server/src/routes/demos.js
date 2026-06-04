@@ -123,6 +123,14 @@ router.patch('/:id', (req, res) => {
     const norm = typeof v === 'string' && v.trim() ? v.trim().slice(0, 80) : null;
     queries.setDemoOfferPrice.run(norm, demo.id);
   }
+  // Custom CSS injected into every served page of this template (and all its
+  // tenants).  Empty string clears it.  64 KB cap is plenty for surgical
+  // design fixes — anything bigger belongs in the template repo.
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'custom_css')) {
+    const v = req.body.custom_css;
+    const norm = typeof v === 'string' && v.trim() ? v.slice(0, 65536) : null;
+    queries.setDemoCustomCss.run(norm, demo.id);
+  }
 
   res.json(serialize(queries.getDemoById.get(demo.id)));
 });

@@ -129,10 +129,19 @@ if (!demoCols.includes('defaults')) {
 if (!demoCols.includes('offer_price')) {
   db.exec(`ALTER TABLE demos ADD COLUMN offer_price TEXT`);
 }
+// Per-template extra CSS injected into every served page (template + its
+// tenants) for design overrides without rebuilding the bundle.
+if (!demoCols.includes('custom_css')) {
+  db.exec(`ALTER TABLE demos ADD COLUMN custom_css TEXT`);
+}
 // Per-tenant offer-price override (null = inherit from template, which inherits from global).
 const tenantCols = db.prepare(`PRAGMA table_info(tenants)`).all().map((c) => c.name);
 if (!tenantCols.includes('offer_price')) {
   db.exec(`ALTER TABLE tenants ADD COLUMN offer_price TEXT`);
+}
+// Per-tenant CSS, layered AFTER the template's CSS so it wins cascade ties.
+if (!tenantCols.includes('custom_css')) {
+  db.exec(`ALTER TABLE tenants ADD COLUMN custom_css TEXT`);
 }
 
 // --- helpers for tenant config parsing ---
@@ -188,6 +197,9 @@ export const queries = {
   setDemoOfferPrice: db.prepare(`
     UPDATE demos SET offer_price = ?, updated_at = datetime('now') WHERE id = ?
   `),
+  setDemoCustomCss: db.prepare(`
+    UPDATE demos SET custom_css = ?, updated_at = datetime('now') WHERE id = ?
+  `),
   deleteDemo: db.prepare('DELETE FROM demos WHERE id = ?'),
 
   // ---- build logs ----
@@ -232,6 +244,9 @@ export const queries = {
   `),
   setTenantOfferPrice: db.prepare(`
     UPDATE tenants SET offer_price = ?, updated_at = datetime('now') WHERE id = ?
+  `),
+  setTenantCustomCss: db.prepare(`
+    UPDATE tenants SET custom_css = ?, updated_at = datetime('now') WHERE id = ?
   `),
   deleteTenant: db.prepare('DELETE FROM tenants WHERE id = ?'),
 

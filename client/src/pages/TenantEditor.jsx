@@ -9,6 +9,7 @@ const BLANK = {
   template_id: null,
   config: BLANK_SITE_CONFIG,
   offer_price: '',
+  custom_css: '',
 };
 
 function autoSlug(s) {
@@ -46,6 +47,7 @@ export default function TenantEditor() {
           template_id: t.template_id,
           config: deepFill(BLANK.config, t.config || {}),
           offer_price: t.offer_price || '',
+          custom_css: t.custom_css || '',
         });
       }).catch((e) => setErr(e.message));
       refreshUploads();
@@ -85,6 +87,7 @@ export default function TenantEditor() {
           name: form.name,
           config: form.config,
           offer_price: form.offer_price,
+          custom_css: form.custom_css,
         });
         const t = await api.getTenant(id);
         setForm((f) => ({
@@ -92,6 +95,7 @@ export default function TenantEditor() {
           name: t.name,
           config: deepFill(BLANK.config, t.config || {}),
           offer_price: t.offer_price || '',
+          custom_css: t.custom_css || '',
         }));
       }
     } catch (e) {
@@ -213,6 +217,35 @@ export default function TenantEditor() {
         uploads={uploads}
         onDeleteUpload={isNew ? null : deleteUpload}
       />
+
+      {/* --- CUSTOM CSS --- */}
+      <section className="card" style={{ marginBottom: 16 }}>
+        <h2 style={{ marginTop: 0 }}>Custom CSS (this tenant only)</h2>
+        <div className="muted" style={{ fontSize: 13, lineHeight: 1.55, marginBottom: 10 }}>
+          Loaded AFTER the template's own custom CSS, so per-tenant tweaks win cascade
+          ties. Use it to patch this tenant's rendered design without rebuilding the
+          template — recolor sections, hide elements, override spacing, etc.
+        </div>
+        <textarea
+          className="textarea"
+          value={form.custom_css || ''}
+          onChange={(e) => setForm((f) => ({ ...f, custom_css: e.target.value }))}
+          placeholder={`/* Example — fix a low-contrast testimonials block */
+section[class*="testimonial"] h2 { color: #ffffff !important; }
+section[class*="testimonial"] p  { color: rgba(255,255,255,0.85); }
+section[class*="testimonial"] [class*="card"] {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.18);
+}`}
+          style={{ minHeight: 200, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace', fontSize: 12.5, lineHeight: 1.55 }}
+          spellCheck={false}
+        />
+        <div className="hint" style={{ marginTop: 6 }}>
+          Up to 64&nbsp;KB. Saved with the rest of the form below. To preview, save and
+          open the tenant URL in a new tab.
+        </div>
+      </section>
 
       {/* --- ACTIONS --- */}
       <div className="row gap-sm" style={{ marginBottom: 60 }}>

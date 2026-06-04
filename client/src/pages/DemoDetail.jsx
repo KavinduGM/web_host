@@ -33,6 +33,7 @@ export default function DemoDetail() {
           build_cmd: d.build_cmd,
           output_dir: d.output_dir,
           offer_price: d.offer_price || '',
+          custom_css: d.custom_css || '',
         });
       }
       if (!defaultsDirty) {
@@ -264,6 +265,19 @@ export default function DemoDetail() {
         </div>
       )}
 
+      {/* Custom CSS — visible whether or not we're in edit mode of Settings */}
+      <CustomCssCard
+        title="Template custom CSS"
+        sublabel="Injected on this template's URL and every tenant of it."
+        value={form.custom_css || ''}
+        onChange={(v) => setForm({ ...form, custom_css: v })}
+        onSave={async () => {
+          await api.updateDemo(id, { custom_css: form.custom_css });
+          load();
+        }}
+        savedValue={demo.custom_css || ''}
+      />
+
       <div className="card" style={{ marginTop: 20 }}>
         <div className="row between" style={{ marginBottom: 8 }}>
           <h2 style={{ margin: 0 }}>Template defaults</h2>
@@ -330,6 +344,55 @@ export default function DemoDetail() {
       <div style={{ marginTop: 16 }}>
         <Link to="/">← Back to dashboard</Link>
       </div>
+    </div>
+  );
+}
+
+function CustomCssCard({ title, sublabel, value, onChange, onSave, savedValue }) {
+  const [busy, setBusy] = useState(false);
+  const [savedFlag, setSavedFlag] = useState(false);
+  const [err, setErr] = useState('');
+  const dirty = (value || '') !== (savedValue || '');
+
+  async function save() {
+    setErr('');
+    setSavedFlag(false);
+    setBusy(true);
+    try { await onSave(); setSavedFlag(true); setTimeout(() => setSavedFlag(false), 2500); }
+    catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div className="card" style={{ marginTop: 20 }}>
+      <div className="row between" style={{ marginBottom: 8 }}>
+        <h2 style={{ margin: 0 }}>{title}</h2>
+        <button className="btn primary" disabled={busy || !dirty} onClick={save}>
+          {busy ? 'Saving…' : savedFlag ? '✓ Saved' : dirty ? 'Save CSS' : 'Saved'}
+        </button>
+      </div>
+      <div className="muted" style={{ fontSize: 13, lineHeight: 1.55, marginBottom: 10 }}>
+        {sublabel} Loaded as the last <span className="mono">&lt;style&gt;</span> in the page,
+        so selectors win cascade ties without <span className="mono">!important</span> for
+        most overrides. Use it to patch a built site's design without rebuilding the bundle —
+        recolor a low-contrast section, hide a stale promo, tweak spacing, etc.
+      </div>
+      {err && <div className="error">{err}</div>}
+      <textarea
+        className="textarea"
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={`/* Example — fix a low-contrast testimonials block */
+section[class*="testimonial"] h2 { color: #ffffff !important; }
+section[class*="testimonial"] p  { color: rgba(255,255,255,0.85); }
+section[class*="testimonial"] [class*="card"] {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.18);
+}`}
+        style={{ minHeight: 220, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace', fontSize: 12.5, lineHeight: 1.55 }}
+        spellCheck={false}
+      />
     </div>
   );
 }

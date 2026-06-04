@@ -143,6 +143,13 @@ router.patch('/:id', (req, res) => {
     const norm = typeof v === 'string' && v.trim() ? v.trim().slice(0, 80) : null;
     queries.setTenantOfferPrice.run(norm, t.id);
   }
+  // Per-tenant CSS layer.  Injected AFTER the template's custom_css so it
+  // wins cascade ties.  Empty string clears it.
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'custom_css')) {
+    const v = req.body.custom_css;
+    const norm = typeof v === 'string' && v.trim() ? v.slice(0, 65536) : null;
+    queries.setTenantCustomCss.run(norm, t.id);
+  }
 
   res.json(serialize(queries.getTenantById(t.id)));
 });

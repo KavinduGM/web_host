@@ -193,6 +193,20 @@ export function demoServerMiddleware() {
         ? { kind: 'tenant', id: activeTenant.id, slug: activeTenant.slug, name: activeTenant.name, offer_price: offerPrice }
         : { kind: 'template', id: activeDemo?.id, slug: slug, name: activeDemo?.name || slug, offer_price: offerPrice }
       );
+
+      // Inject per-template + per-tenant Custom CSS so admins can patch a
+      // built site's design without rebuilding the bundle (e.g. fix a low-
+      // contrast section, recolor a hero, hide a stale promo).  The block
+      // lands just before </body> so it loads AFTER every <link rel="stylesheet">
+      // in the head — that way every selector wins cascade ties naturally,
+      // no `!important` spam needed for most overrides.  Tenant CSS comes
+      // after template CSS so per-tenant tweaks override template ones.
+      const templateCustomCss = activeTenant
+        ? (activeTenant.template_id ? queries.getDemoById.get(activeTenant.template_id)?.custom_css : null)
+        : (activeDemo?.custom_css || null);
+      const tenantCustomCss = activeTenant?.custom_css || null;
+      out = injectCustomCss(out, templateCustomCss, tenantCustomCss);
+
       return res.send(out);
     } catch (err) {
       console.error('[demoServer] inject failed:', err);
@@ -423,6 +437,34 @@ function replaceLiteral(html, re, replacement) {
  * The loader script is appended just before </body> so the widget doesn't
  * compete with the page's own scripts for initial paint.
  */
+/**
+ * Inject one or two <style> blocks of admin-supplied CSS just before </body>.
+ * Each block is wrapped in a `</style>`-safe escape so a stray closing tag
+ * inside the CSS can't escape the block.  Blocks are tagged with
+ * data-source="template|tenant" so they're easy to inspect.
+ */
+function injectCustomCss(html, templateCss, tenantCss) {
+  const blocks = [];
+  if (templateCss && templateCss.trim()) {
+    blocks.push(`<style data-source="template-custom">${cssSafe(templateCss)}</style>`);
+  }
+  if (tenantCss && tenantCss.trim()) {
+    blocks.push(`<style data-source="tenant-custom">${cssSafe(tenantCss)}</style>`);
+  }
+  if (!blocks.length) return html;
+  const snippet = blocks.join('');
+  if (/<\/body>/i.test(html)) {
+    return html.replace(/<\/body>/i, () => `${snippet}</body>`);
+  }
+  return html + snippet;
+}
+
+// </style> inside a <style> closes the element; replace with an HTML-safe
+// escape that the CSS parser still tolerates.
+function cssSafe(s) {
+  return String(s).replace(/<\/style/gi, '<\\/style');
+}
+
 function injectClaimWidget(html, source) {
   const ctxJson = serializeForScript({
     source_kind: source.kind,
